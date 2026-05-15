@@ -224,7 +224,7 @@ FROM Cargos;
                         "INSERT INTO LeisPertinentes "
                         "(cargo_id,numero,ano,descricao,acao,quantidade,texto_original)"
                         " VALUES (?,?,?,?,?,?,?)",
-                        (cid, num, ano, col[:200], p['acao'],
+                        (cid, num, ano, txt[:500], p['acao'],
                          p['quantidade'] if p['acao'] in ('Cria','Extingue','Fixa') else None,
                          txt[:500])
                     )

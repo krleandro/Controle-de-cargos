@@ -377,6 +377,27 @@ def baixar_relatorio(cargo_id):
         download_name=filename
     )
 
+@app.route("/api/backup", methods=["GET"])
+def fazer_backup():
+    """Baixa o banco de dados inteiro como backup."""
+    import shutil
+    from datetime import datetime
+    
+    backup_filename = f"Backup_FOPAG_{datetime.now().strftime('%Y%m%d_%H%M')}.db"
+    
+    # É mais seguro copiar o arquivo para um temporário antes de enviar, caso esteja em uso
+    import tempfile
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, backup_filename)
+    
+    shutil.copy2(DB_PATH, temp_path)
+    
+    return send_file(
+        temp_path,
+        as_attachment=True,
+        download_name=backup_filename
+    )
+
 @app.route("/")
 def index():
     with open(HTML_DIR / "index.html", "r", encoding="utf-8") as f:

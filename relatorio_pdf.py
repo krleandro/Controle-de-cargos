@@ -41,7 +41,7 @@ DOURADO        = (180, 145, 40)
 class RelatorioCargoPDF(FPDF):
     """PDF A4 para relatório individual de cargo — layout institucional."""
 
-    FONT_FAMILY = "helvetica"
+    FONT_FAMILY = "Roboto"
     PAGE_W   = 210
     MARGIN_X = 20
     CONTENT_W = 170  # PAGE_W - 2*MARGIN_X
@@ -54,7 +54,11 @@ class RelatorioCargoPDF(FPDF):
         self._setup_fonts()
 
     def _setup_fonts(self):
-        pass  # helvetica is a core font and doesn't need to be added
+        import os
+        base_dir = os.path.dirname(__file__)
+        self.add_font("Roboto", "", os.path.join(base_dir, "Roboto-Regular.ttf"))
+        self.add_font("Roboto", "B", os.path.join(base_dir, "Roboto-Bold.ttf"))
+        self.add_font("Roboto", "I", os.path.join(base_dir, "Roboto-Italic.ttf"))
 
     def _set_font(self, style="", size=11):
         self.set_font(self.FONT_FAMILY, style, size)

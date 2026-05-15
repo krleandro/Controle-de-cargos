@@ -617,6 +617,9 @@
     </button>
   </nav>
   <div class="sidebar-footer">
+    <button class="nav-item" onclick="fazerBackup()" style="margin-bottom:12px; color: var(--blue-primary); background: var(--bg-xlightblue); border: 1px solid var(--blue-light); justify-content: center; font-weight: 600;">
+      <span>💾</span> Fazer Backup do Banco
+    </button>
     Prefeitura Municipal<br>de Miracema
   </div>
 </aside>
@@ -1496,7 +1499,31 @@ async function submitOcupados() {
   } catch(e) { toast(e.message,'err'); }
 }
 
-// ── Navegação de views ─────────────────────────────────────────────────────
+// ── Navegação de views e Backup ──────────────────────────────────────────────
+async function fazerBackup() {
+  try {
+    toast('Iniciando backup...', 'ok');
+    const r = await fetch('/api/backup');
+    if (!r.ok) throw new Error('Erro ao gerar backup');
+    const blob = await r.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    let fname = `backup_fopag_${new Date().toISOString().slice(0,10)}.db`;
+    const disp = r.headers.get('content-disposition');
+    if (disp) {
+      const m = disp.match(/filename\*?=(?:UTF-8'')?"?([^"]+)"?/);
+      if (m) fname = decodeURIComponent(m[1]);
+    }
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    toast('Backup salvo com sucesso!', 'ok');
+  } catch(e) { toast(e.message, 'err'); }
+}
 async function gerarRelatorioPDF() {
   if (!state.cargoAtivo) { toast('Selecione um cargo primeiro.', 'err'); return; }
   try {

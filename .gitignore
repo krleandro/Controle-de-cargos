@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+quadro_pessoal.db
+meuambiente/
+venv/
+.env
+.DS_Store

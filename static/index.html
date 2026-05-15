@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOPAG — Gestão de Cargos · Miracema</title>
+<style>
+  /* ── Importar fonte Inter ─────────────────────────────────────────── */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  /* ── Design tokens ────────────────────────────────────────────────── */
+  :root {
+    --bg-page:      #FFFFFF;
+    --bg-sidebar:   #F8F9FB;
+    --bg-hover:     #EFF4FF;
+    --bg-selected:  #DBEAFE;
+    --bg-input:     #F8F9FB;
+    --bg-xlightblue:#EFF6FF;
+
+    --blue-primary: #2563EB;
+    --blue-hover:   #1D4ED8;
+    --blue-medium:  #3B82F6;
+    --blue-light:   #BFDBFE;
+    --blue-dark:    #1E3A8A;
+    --blue-focus:   #93C5FD;
+
+    --success-bg:   #ECFDF5; --success-text: #065F46;
+    --warning-bg:   #FFFBEB; --warning-text: #92400E;
+    --danger-bg:    #FEF2F2; --danger-text:  #991B1B;
+    --extinct-bg:   #F3F4F6; --extinct-text: #6B7280;
+
+    --text-primary:   #111827;
+    --text-secondary: #6B7280;
+    --text-muted:     #9CA3AF;
+    --text-onblue:    #FFFFFF;
+
+    --border:    #E5E7EB;
+    --border-focus: #3B82F6;
+
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+  }
+
+  /* ── Reset e base ─────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    color: var(--text-primary);
+    background: var(--bg-page);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  button { cursor: pointer; font-family: inherit; }
+  input, select, textarea { font-family: inherit; }
+
+  /* ── Sidebar ──────────────────────────────────────────────────────── */
+  #sidebar {
+    width: 232px;
+    min-width: 232px;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .sidebar-brand {
+    padding: 24px 20px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .brand-icon {
+    width: 34px; height: 34px;
+    background: var(--blue-primary);
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 17px;
+    flex-shrink: 0;
+  }
+  .brand-text p:first-child { font-size: 13px; font-weight: 700; line-height: 1.2; }
+  .brand-text p:last-child  { font-size: 10px; color: var(--text-secondary); line-height: 1.3; }
+
+  nav { padding: 14px 10px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px;
+    width: 100%; padding: 9px 12px;
+    border-radius: var(--radius-md); border: none;
+    background: transparent; color: var(--text-secondary);
+    font-size: 13px; font-weight: 400;
+    text-align: left; margin-bottom: 2px;
+    transition: background .12s, color .12s;
+  }
+  .nav-item:hover { background: var(--bg-hover); }
+  .nav-item.active {
+    background: var(--bg-selected);
+    color: var(--blue-primary);
+    font-weight: 600;
+  }
+  .nav-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--blue-primary); margin-left: auto;
+  }
+  .sidebar-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 10px; color: var(--text-muted); line-height: 1.6;
+  }
+
+  /* ── Área principal ───────────────────────────────────────────────── */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  /* ── Header ───────────────────────────────────────────────────────── */
+  #header {
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    flex-shrink: 0;
+  }
+  #header h1 { font-size: 19px; font-weight: 700; }
+  #header p  { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .header-actions { display: flex; align-items: center; gap: 10px; }
+  .search-wrap { position: relative; }
+  .search-wrap input {
+    padding: 7px 12px 7px 32px;
+    width: 260px; border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg-input); font-size: 13px;
+    outline: none; transition: border-color .15s;
+  }
+  .search-wrap input:focus { border-color: var(--border-focus); }
+  .search-icon {
+    position: absolute; left: 9px; top: 50%;
+    transform: translateY(-50%); color: var(--text-muted); font-size: 13px;
+    pointer-events: none;
+  }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600;
+    border-radius: var(--radius-md); border: none;
+    background: var(--blue-primary); color: #fff;
+    transition: background .15s;
+    white-space: nowrap;
+  }
+  .btn-primary:hover { background: var(--blue-hover); }
+  .btn-outline {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; font-size: 12px; font-weight: 600;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--blue-primary);
+    background: var(--bg-xlightblue); color: var(--blue-primary);
+    transition: background .15s;
+    white-space: nowrap;
+  }
+  .btn-outline:hover { background: var(--bg-selected); }
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 12px; font-size: 12px; font-weight: 500;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: transparent; color: var(--text-secondary);
+    transition: background .15s;
+  }
+  .btn-ghost:hover { background: var(--bg-hover); }
+
+  /* ── Conteúdo rolável ─────────────────────────────────────────────── */
+  #content { flex: 1; overflow-y: auto; padding: 0 0 32px; }
+
+  /* ── Stats bar ────────────────────────────────────────────────────── */
+  #stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    padding: 22px 28px 0;
+  }
+  .stat-card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 18px 20px;
+    position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .stat-card.blue::before  { background: var(--blue-primary); }
+  .stat-card.light::before { background: var(--blue-medium); }
+  .stat-card.green::before { background: var(--success-text); }
+  .stat-card.red::before   { background: var(--danger-text); }
+  .stat-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--text-secondary); margin-bottom: 6px;
+  }
+  .stat-value { font-size: 26px; font-weight: 700; line-height: 1; margin-bottom: 3px; }
+  .stat-sub   { font-size: 11px; color: var(--text-secondary); }
+
+  /* ── Toolbar ──────────────────────────────────────────────────────── */
+  #toolbar {
+    padding: 20px 28px 0;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  }
+  .filter-group {
+    display: flex; gap: 3px;
+    background: var(--bg-sidebar); border-radius: var(--radius-md);
+    padding: 4px; border: 1px solid var(--border);
+  }
+  .filter-btn {
+    padding: 5px 11px; font-size: 12px; font-weight: 400;
+    border-radius: var(--radius-sm); border: none;
+    background: transparent; color: var(--text-secondary);
+    transition: all .12s;
+  }
+  .filter-btn.active {
+    background: var(--bg-selected); color: var(--blue-primary); font-weight: 600;
+  }
+  .filter-btn:hover:not(.active) { background: var(--bg-hover); }
+  #toolbar-count { margin-left: auto; font-size: 12px; color: var(--text-secondary); }
+
+  /* ── Tabela ───────────────────────────────────────────────────────── */
+  #table-wrap {
+    margin: 18px 28px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: #fff;
+  }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--bg-sidebar); }
+  th {
+    padding: 10px 10px; text-align: left;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap; user-select: none; cursor: pointer;
+  }
+  th:hover { color: var(--blue-primary); }
+  th.no-sort { cursor: default; }
+  th.no-sort:hover { color: var(--text-secondary); }
+  th .sort-arrow { margin-left: 3px; color: var(--blue-primary); }
+  td {
+    padding: 10px 10px; font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr.data-row { cursor: pointer; transition: background .1s; }
+  tr.data-row:hover td { background: var(--bg-hover); }
+  tr.data-row.selected td { background: var(--bg-selected); }
+  tr.odd td { background: var(--bg-sidebar); }
+  tr.odd:hover td { background: var(--bg-hover); }
+  .td-nome { display: block; max-width: 200px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .td-code { color: var(--text-secondary); font-family: monospace; font-size: 12px; }
+  .td-center { text-align: center; }
+  .td-num    { text-align: center; font-weight: 600; }
+
+  /* Badges ─────────────────────────────────────────────────────────── */
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge-vigor    { background: var(--bg-xlightblue);  color: var(--blue-primary); }
+  .badge-extinto  { background: var(--extinct-bg);     color: var(--extinct-text); }
+  .badge-revogado { background: var(--danger-bg);      color: var(--danger-text); }
+  
+  .badge-delib-env { background: var(--success-bg); color: var(--success-text); }
+  .badge-delib-salvo { background: var(--warning-bg); color: var(--warning-text); }
+  .badge-delib-nao { background: var(--danger-bg); color: var(--danger-text); }
+
+  .saldo-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+    min-width: 38px;
+  }
+  .saldo-pos { background: var(--success-bg); color: var(--success-text); }
+  .saldo-zer { background: var(--warning-bg); color: var(--warning-text); }
+  .saldo-neg { background: var(--danger-bg);  color: var(--danger-text); }
+
+  /* Ações inline */
+  .action-btn {
+    padding: 4px 8px; border-radius: var(--radius-sm);
+    border: none; background: transparent; color: var(--blue-medium);
+    font-size: 16px; transition: background .1s; line-height: 1;
+  }
+  .action-btn:hover { background: var(--bg-hover); }
+
+  /* Rodapé da tabela */
+  .table-footer {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-sidebar);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .table-footer span { font-size: 11px; color: var(--text-muted); }
+
+  /* Estado vazio */
+  .empty-state {
+    padding: 52px 20px; text-align: center; color: var(--text-muted); font-size: 13px;
+  }
+
+  /* ── Painel de detalhe (drawer lateral) ───────────────────────────── */
+  #drawer {
+    position: fixed; top: 0; right: -420px; bottom: 0;
+    width: 420px; background: #fff;
+    border-left: 1px solid var(--border);
+    box-shadow: -4px 0 24px rgba(0,0,0,.08);
+    display: flex; flex-direction: column;
+    transition: right .25s cubic-bezier(.4,0,.2,1);
+    z-index: 200;
+    overflow: hidden;
+  }
+  #drawer.open { right: 0; }
+  .drawer-header {
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+    flex-shrink: 0;
+  }
+  .drawer-header h2 { font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .drawer-header p  { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .close-btn {
+    border: none; background: transparent; font-size: 20px;
+    color: var(--text-muted); padding: 2px 6px; border-radius: 6px;
+    line-height: 1; flex-shrink: 0;
+  }
+  .close-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 18px 22px; }
+  .drawer-section { margin-bottom: 22px; }
+  .drawer-section-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--text-secondary); margin-bottom: 10px;
+  }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .info-item label { font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px; }
+  .info-item span  { font-size: 13px; font-weight: 500; }
+  .saldo-big {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px; border-radius: var(--radius-lg);
+    margin-bottom: 14px;
+  }
+  .saldo-big .num { font-size: 32px; font-weight: 700; }
+  .saldo-big .lbl { font-size: 12px; }
+  /* Tabela de leis no drawer */
+  .leis-list { display: flex; flex-direction: column; gap: 6px; }
+  .lei-row {
+    padding: 9px 12px; border-radius: var(--radius-md);
+    background: var(--bg-sidebar); border: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  .lei-row .lei-num { font-size: 12px; font-weight: 700; color: var(--blue-primary); white-space: nowrap; }
+  .lei-row .lei-txt { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
+  .lei-acao {
+    display: inline-flex; align-items: center;
+    padding: 1px 7px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; white-space: nowrap; flex-shrink: 0;
+  }
+  .lei-acao.Cria       { background: #dcfce7; color: #15803d; }
+  .lei-acao.Extingue   { background: var(--danger-bg); color: var(--danger-text); }
+  .lei-acao.Fixa       { background: #fef9c3; color: #a16207; }
+  .lei-acao.Altera     { background: var(--bg-selected); color: var(--blue-primary); }
+  .lei-acao.Regulamenta{ background: var(--bg-sidebar); color: var(--text-secondary); }
+  .lei-acao.Outro      { background: var(--bg-sidebar); color: var(--text-muted); }
+  .drawer-footer {
+    padding: 14px 22px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px;
+    flex-shrink: 0;
+  }
+
+  /* ── Modais ───────────────────────────────────────────────────────── */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.38);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 300; backdrop-filter: blur(2px);
+    opacity: 0; pointer-events: none; transition: opacity .18s;
+  }
+  .overlay.show { opacity: 1; pointer-events: all; }
+  .modal {
+    background: #fff; border-radius: var(--radius-xl);
+    padding: 28px; width: 480px; max-width: 95vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,.14);
+    transform: translateY(8px); transition: transform .18s;
+  }
+  .overlay.show .modal { transform: translateY(0); }
+  .modal-header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .modal-header h2 { font-size: 16px; font-weight: 700; }
+  .modal-header p  { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .form-group label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-secondary);
+  }
+  .form-control {
+    padding: 8px 11px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: var(--radius-md);
+    background: var(--bg-input); color: var(--text-primary);
+    outline: none; transition: border-color .15s; width: 100%;
+  }
+  .form-control:focus { border-color: var(--border-focus); }
+  textarea.form-control { resize: vertical; min-height: 64px; }
+  .impact-preview {
+    padding: 11px 14px; border-radius: var(--radius-md);
+    background: var(--bg-xlightblue); border: 1px solid var(--blue-light);
+    font-size: 12px; color: var(--blue-dark); margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+  /* ── Toast ────────────────────────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    padding: 12px 18px; border-radius: var(--radius-lg);
+    font-size: 13px; font-weight: 500; color: #fff;
+    box-shadow: 0 4px 20px rgba(0,0,0,.15);
+    transform: translateY(80px); opacity: 0;
+    transition: all .25s cubic-bezier(.4,0,.2,1);
+    z-index: 500; max-width: 320px;
+    background: var(--blue-primary);
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.err  { background: var(--danger-text); }
+  #toast.ok   { background: var(--success-text); }
+
+  /* ── Spinner ──────────────────────────────────────────────────────── */
+  .spin {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--blue-light); border-top-color: var(--blue-primary);
+    border-radius: 50%; animation: spin .6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Scrollbar ────────────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+
+  /* ── Alternância de modo de visualização ─────────────────────────── */
+  .view-toggle {
+    display: flex; gap: 2px;
+    background: var(--bg-sidebar); border-radius: var(--radius-md);
+    padding: 3px; border: 1px solid var(--border);
+  }
+  .view-btn {
+    width: 30px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-sm); border: none;
+    background: transparent; color: var(--text-muted);
+    font-size: 15px; line-height: 1;
+    transition: all .15s;
+  }
+  .view-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .view-btn.active {
+    background: #fff;
+    color: var(--blue-primary);
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  }
+
+  /* ── Modo Cartões ─────────────────────────────────────────────────── */
+  #cards-wrap {
+    display: none;
+    margin: 18px 28px 0;
+  }
+  #cards-wrap.visible { display: block; }
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  .cargo-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow .15s, border-color .15s, transform .12s;
+    display: flex; flex-direction: column;
+  }
+  .cargo-card:hover {
+    box-shadow: 0 4px 16px rgba(37,99,235,.1);
+    border-color: var(--blue-light);
+    transform: translateY(-1px);
+  }
+  .cargo-card.selected {
+    border-color: var(--blue-primary);
+    box-shadow: 0 0 0 2px var(--blue-light);
+  }
+  .card-top { height: 4px; flex-shrink: 0; }
+  .card-top.vigor    { background: var(--blue-primary); }
+  .card-top.extinto  { background: var(--extinct-text); }
+  .card-top.revogado { background: var(--danger-text); }
+  .card-body { padding: 14px 16px 12px; flex: 1; display: flex; flex-direction: column; gap: 0; }
+  .card-nome {
+    font-size: 13px; font-weight: 600; line-height: 1.35;
+    color: var(--text-primary); margin-bottom: 8px;
+    display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .card-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+  .card-metrics {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px; margin-top: auto;
+  }
+  .card-metric {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 7px 4px; border-radius: var(--radius-md);
+    background: var(--bg-sidebar);
+  }
+  .card-metric .m-val { font-size: 18px; font-weight: 700; line-height: 1; margin-bottom: 2px; }
+  .card-metric .m-lbl {
+    font-size: 9px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--text-muted);
+  }
+  .card-metric.saldo-pos-card { background: var(--success-bg); }
+  .card-metric.saldo-pos-card .m-val { color: var(--success-text); }
+  .card-metric.saldo-zer-card { background: var(--warning-bg); }
+  .card-metric.saldo-zer-card .m-val { color: var(--warning-text); }
+  .card-metric.saldo-neg-card { background: var(--danger-bg); }
+  .card-metric.saldo-neg-card .m-val { color: var(--danger-text); }
+  .card-foot {
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-code { font-size: 10.5px; color: var(--text-muted); font-family: monospace; }
+  .card-ch   { font-size: 10.5px; color: var(--text-secondary); }
+
+  /* ── Modo Compacto ────────────────────────────────────────────────── */
+  #compact-wrap {
+    display: none;
+    margin: 18px 28px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: #fff;
+  }
+  #compact-wrap.visible { display: block; }
+  .compact-header {
+    display: grid;
+    grid-template-columns: 1fr 96px 82px 68px 68px 52px;
+    padding: 8px 16px;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border);
+  }
+  .compact-header span {
+    font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--text-secondary);
+  }
+  .compact-header span:not(:first-child) { text-align: center; }
+  .compact-row {
+    display: grid;
+    grid-template-columns: 1fr 96px 82px 68px 68px 52px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    align-items: center; min-height: 38px;
+    cursor: pointer; transition: background .1s;
+  }
+  .compact-row:last-child { border-bottom: none; }
+  .compact-row:hover  { background: var(--bg-hover); }
+  .compact-row.selected { background: var(--bg-selected); }
+  .compact-row.alt    { background: var(--bg-sidebar); }
+  .compact-row.alt:hover { background: var(--bg-hover); }
+  .compact-nome {
+    font-size: 12.5px; font-weight: 500; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; padding-right: 12px;
+  }
+  .compact-cell { text-align: center; font-size: 12px; color: var(--text-secondary); }
+  .compact-num  { text-align: center; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .compact-actions { display: flex; justify-content: center; }
+  .compact-foot {
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-sidebar);
+    font-size: 11px; color: var(--text-muted);
+    display: flex; justify-content: space-between;
+  }
+
+  /* ── Transição suave entre views ──────────────────────────────────── */
+  #table-wrap, #cards-wrap, #compact-wrap {
+    animation: fadeIn .18s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<!-- ── SIDEBAR ──────────────────────────────────────────────────────────── -->
+<aside id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">⊞</div>
+    <div class="brand-text">
+      <p>FOPAG</p>
+      <p>Quadro de Pessoal</p>
+    </div>
+  </div>
+  <nav>
+    <button class="nav-item active" onclick="setView('quadro',this)">
+      <span>⊞</span> Quadro de Pessoal
+      <span class="nav-dot"></span>
+    </button>
+    <button class="nav-item" onclick="setView('leis',this)">
+      <span>⚖</span> Histórico de Leis
+    </button>
+    <button class="nav-item" onclick="setView('alertas',this)">
+      <span>⚠</span> Alertas
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    Prefeitura Municipal<br>de Miracema
+  </div>
+</aside>
+
+<!-- ── ÁREA PRINCIPAL ────────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- Header -->
+  <header id="header">
+    <div>
+      <h1>Quadro de Pessoal</h1>
+      <p>Cargos efetivos e comissionados · Prefeitura de Miracema</p>
+    </div>
+    <div class="header-actions">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="search" type="text" placeholder="Buscar cargo ou código FOPAG…" oninput="debouncedFetch()">
+      </div>
+      <button class="btn-primary" onclick="abrirModalNovoCargo()">
+        <span style="font-size:16px;line-height:1">+</span> Novo Cargo
+      </button>
+    </div>
+  </header>
+
+  <!-- Conteúdo rolável -->
+  <div id="content">
+
+    <!-- Stats -->
+    <div id="stats-bar">
+      <div class="stat-card blue">
+        <div class="stat-label">Total Previstos</div>
+        <div class="stat-value" id="s-previstos">—</div>
+        <div class="stat-sub">vagas no quadro</div>
+      </div>
+      <div class="stat-card light">
+        <div class="stat-label">Total Ocupados</div>
+        <div class="stat-value" id="s-ocupados">—</div>
+        <div class="stat-sub">vagas providas</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Saldo de Vagas</div>
+        <div class="stat-value" id="s-saldo">—</div>
+        <div class="stat-sub">disponíveis</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-label">Alertas</div>
+        <div class="stat-value" id="s-alertas">—</div>
+        <div class="stat-sub">saldos negativos</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div id="toolbar">
+      <div class="filter-group" id="fg-situacao">
+        <button class="filter-btn active" data-val="Todos" onclick="setFiltro('situacao',this)">Todos</button>
+        <button class="filter-btn" data-val="Em vigor"  onclick="setFiltro('situacao',this)">Em vigor</button>
+        <button class="filter-btn" data-val="Extinto"   onclick="setFiltro('situacao',this)">Extinto</button>
+        <button class="filter-btn" data-val="Revogado"  onclick="setFiltro('situacao',this)">Revogado</button>
+      </div>
+      <div class="filter-group" id="fg-tipo">
+        <button class="filter-btn active" data-val="Todos"    onclick="setFiltro('tipo',this)">Todos</button>
+        <button class="filter-btn" data-val="Efetivo"  onclick="setFiltro('tipo',this)">Efetivo</button>
+        <button class="filter-btn" data-val="Comissão" onclick="setFiltro('tipo',this)">Comissão</button>
+      </div>
+      <span id="toolbar-count"></span>
+
+      <!-- Botão de lei + alternância de view -->
+      <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+        <button class="btn-outline" onclick="abrirModalLeiGlobal()">
+          ⚖ Registrar Lei
+        </button>
+        <div class="view-toggle" title="Modo de visualização">
+          <button class="view-btn active" id="vbtn-table"   onclick="setViewMode('table')"   title="Tabela">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="13" height="3" rx="1" fill="currentColor" opacity=".35"/><rect x="1" y="6" width="13" height="3" rx="1" fill="currentColor" opacity=".6"/><rect x="1" y="11" width="13" height="3" rx="1" fill="currentColor"/></svg>
+          </button>
+          <button class="view-btn" id="vbtn-cards"   onclick="setViewMode('cards')"   title="Cartões">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg>
+          </button>
+          <button class="view-btn" id="vbtn-compact" onclick="setViewMode('compact')" title="Compacto">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1.5" width="13" height="1.5" rx=".75" fill="currentColor" opacity=".3"/><rect x="1" y="4.75" width="13" height="1.5" rx=".75" fill="currentColor" opacity=".5"/><rect x="1" y="8" width="13" height="1.5" rx=".75" fill="currentColor" opacity=".7"/><rect x="1" y="11.25" width="13" height="1.5" rx=".75" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div id="table-wrap">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortBy('nome')">Cargo <span class="sort-arrow" id="arrow-nome">↑</span></th>
+              <th onclick="sortBy('codigo_fopag')">Cód. FOPAG <span class="sort-arrow hidden" id="arrow-codigo_fopag"></span></th>
+              <th onclick="sortBy('situacao')">Situação <span class="sort-arrow hidden" id="arrow-situacao"></span></th>
+              <th onclick="sortBy('situacao_delib')">Delib 359 <span class="sort-arrow hidden" id="arrow-situacao_delib"></span></th>
+              <th onclick="sortBy('tipo_provimento')">Provimento <span class="sort-arrow hidden" id="arrow-tipo_provimento"></span></th>
+              <th onclick="sortBy('carga_horaria')" title="Carga horária">CH <span class="sort-arrow hidden" id="arrow-carga_horaria"></span></th>
+              <th onclick="sortBy('total_previstos')" class="td-center">Previstos <span class="sort-arrow hidden" id="arrow-total_previstos"></span></th>
+              <th onclick="sortBy('total_ocupados')"  class="td-center">Ocupados <span class="sort-arrow hidden" id="arrow-total_ocupados"></span></th>
+              <th onclick="sortBy('saldo_vagas')"     class="td-center">Saldo <span class="sort-arrow hidden" id="arrow-saldo_vagas"></span></th>
+              <th class="no-sort"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td colspan="10" class="empty-state"><span class="spin"></span> Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span id="table-count">—</span>
+        <span>Saldo calculado em tempo real · FOPAG</span>
+      </div>
+    </div>
+
+    <!-- Cartões -->
+    <div id="cards-wrap">
+      <div class="cards-grid" id="cards-grid"></div>
+      <div style="padding:10px 0 0;font-size:11px;color:var(--text-muted);text-align:right" id="cards-count"></div>
+    </div>
+
+    <!-- Compacto -->
+    <div id="compact-wrap">
+      <div class="compact-header">
+        <span>Cargo</span>
+        <span>Situação</span>
+        <span>Provimento</span>
+        <span>Previstos</span>
+        <span>Saldo</span>
+        <span></span>
+      </div>
+      <div id="compact-list"></div>
+      <div class="compact-foot">
+        <span id="compact-count">—</span>
+        <span>FOPAG · Prefeitura de Miracema</span>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ── DRAWER DE DETALHE ─────────────────────────────────────────────────── -->
+<div id="drawer">
+  <div class="drawer-header">
+    <div>
+      <h2 id="d-nome">—</h2>
+      <p id="d-sub">—</p>
+    </div>
+    <button class="close-btn" onclick="fecharDrawer()">×</button>
+  </div>
+  <div class="drawer-body">
+
+    <!-- Saldo em destaque -->
+    <div class="saldo-big" id="d-saldo-box">
+      <div>
+        <div class="num" id="d-saldo-num">—</div>
+        <div class="lbl">Saldo de vagas</div>
+      </div>
+      <div style="margin-left:auto;text-align:right;font-size:12px;color:var(--text-secondary)">
+        <div><strong id="d-prev">—</strong> previstos</div>
+        <div><strong id="d-ocup">—</strong> ocupados</div>
+      </div>
+    </div>
+
+    <!-- Info do cargo -->
+    <div class="drawer-section">
+      <div class="drawer-section-title">Informações</div>
+      <div class="info-grid">
+        <div class="info-item"><label>Código FOPAG</label><span id="d-fopag">—</span></div>
+        <div class="info-item"><label>Situação</label><span id="d-situacao">—</span></div>
+        <div class="info-item"><label>Situação Delib. 359</label><span id="d-situacao_delib">—</span></div>
+        <div class="info-item"><label>Tipo de Provimento</label><span id="d-tipo">—</span></div>
+        <div class="info-item"><label>Carga Horária</label><span id="d-ch">—</span></div>
+        <div class="info-item"><label>Símbolo de Vencimento</label><span id="d-simb">—</span></div>
+        <div class="info-item"><label>Escolaridade</label><span id="d-esc">—</span></div>
+      </div>
+    </div>
+
+    <!-- Histórico de leis -->
+    <div class="drawer-section">
+      <div class="drawer-section-title" style="display:flex;align-items:center;justify-content:space-between">
+        Leis Pertinentes
+        <button class="btn-outline" style="font-size:11px;padding:3px 10px" onclick="abrirModalLei()">+ Registrar Lei</button>
+      </div>
+      <div class="leis-list" id="d-leis">
+        <div style="font-size:12px;color:var(--text-muted)">Carregando…</div>
+      </div>
+    </div>
+
+  </div>
+  <div class="drawer-footer">
+    <button class="btn-outline" onclick="abrirModalCargoEdicao()">✏ Editar Cargo</button>
+    <button class="btn-outline" onclick="gerarRelatorioPDF()" style="margin-left:auto">📄 Gerar Relatório</button>
+    <button class="btn-ghost" onclick="abrirModalOcupados()">✏ Ocupados</button>
+  </div>
+</div>
+
+<!-- ── MODAL: REGISTRAR LEI ─────────────────────────────────────────────── -->
+<div class="overlay" id="overlay-lei" onclick="if(event.target===this)fecharModalLei()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h2>Registrar Lei Pertinente</h2>
+        <p id="ml-cargo-nome" style="color:var(--text-secondary)"></p>
+      </div>
+      <button class="close-btn" onclick="fecharModalLei()">×</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Número da Lei</label>
+        <input class="form-control" id="ml-numero" placeholder="ex: 2194">
+      </div>
+      <div class="form-group">
+        <label>Ano</label>
+        <input class="form-control" id="ml-ano" type="number" placeholder="ex: 2024">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Ação Disparada</label>
+      <select class="form-control" id="ml-acao" onchange="atualizarPreview()">
+        <option>Cria</option>
+        <option>Extingue</option>
+        <option>Fixa</option>
+        <option>Altera</option>
+        <option>Regulamenta</option>
+        <option>Outro</option>
+      </select>
+    </div>
+    <div class="form-group" id="ml-qty-group">
+      <label id="ml-qty-label">Quantidade de Vagas</label>
+      <input class="form-control" id="ml-quantidade" type="number" min="0" placeholder="ex: 3" oninput="atualizarPreview()">
+    </div>
+    <div class="impact-preview" id="ml-preview" style="display:none"></div>
+    <div class="form-group">
+      <label>Descrição / Ementa</label>
+      <textarea class="form-control" id="ml-descricao" placeholder="Descrição resumida da lei…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="fecharModalLei()">Cancelar</button>
+      <button class="btn-primary" onclick="submitLei()">Registrar Lei</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: NOVO / EDITAR CARGO ─────────────────────────────────────────────────── -->
+<div class="overlay" id="overlay-cargo" onclick="if(event.target===this)fecharModalCargo()">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <div><h2 id="mc-title">Novo Cargo</h2><p style="color:var(--text-secondary);font-size:12px">Preencha os dados do cargo</p></div>
+      <button class="close-btn" onclick="fecharModalCargo()">×</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Nome do Cargo *</label>
+        <input class="form-control" id="nc-nome" placeholder="ex: Assistente Administrativo">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Código FOPAG</label>
+        <input class="form-control" id="nc-fopag" placeholder="ex: 1200">
+      </div>
+      <div class="form-group">
+        <label>Símbolo de Vencimento</label>
+        <input class="form-control" id="nc-simb" placeholder="ex: P-34">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Situação</label>
+        <select class="form-control" id="nc-situacao">
+          <option>Em vigor</option><option>Extinto</option><option>Revogado</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Situação Delib. 359</label>
+        <select class="form-control" id="nc-situacao-delib">
+          <option>não enviado</option>
+          <option>salvo - em revisão</option>
+          <option>Enviado</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo de Provimento</label>
+        <select class="form-control" id="nc-tipo">
+          <option>Efetivo</option><option>Comissão</option><option>Eletivo</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Carga Horária</label>
+        <select class="form-control" id="nc-ch">
+          <option value="">Não informada</option>
+          <option>10</option><option>20</option><option>25</option>
+          <option>30</option><option>40</option><option>44</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Escolaridade / Requisito</label>
+        <input class="form-control" id="nc-esc" placeholder="ex: Superior completo">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Total Previstos</label>
+        <input class="form-control" id="nc-prev" type="number" value="0" min="0">
+      </div>
+      <div class="form-group">
+        <label>Total Ocupados</label>
+        <input class="form-control" id="nc-ocup" type="number" value="0" min="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Atribuições</label>
+      <textarea class="form-control" id="nc-atr" placeholder="Descrição das atribuições do cargo…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="fecharModalCargo()">Cancelar</button>
+      <button class="btn-primary" id="btn-submit-cargo" onclick="submitCargo()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: ATUALIZAR OCUPADOS ─────────────────────────────────────────── -->
+<div class="overlay" id="overlay-ocup" onclick="if(event.target===this)fecharModalOcupados()">
+  <div class="modal" style="width:360px">
+    <div class="modal-header">
+      <div><h2>Atualizar Vagas Ocupadas</h2><p id="mo-nome" style="color:var(--text-secondary);font-size:12px"></p></div>
+      <button class="close-btn" onclick="fecharModalOcupados()">×</button>
+    </div>
+    <div class="form-group">
+      <label>Total de Vagas Ocupadas</label>
+      <input class="form-control" id="mo-ocupados" type="number" min="0">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="fecharModalOcupados()">Cancelar</button>
+      <button class="btn-primary" onclick="submitOcupados()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ─────────────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+// ── Estado global ──────────────────────────────────────────────────────────
+const state = {
+  cargos:        [],
+  filtroSituacao:'Todos',
+  filtroTipo:    'Todos',
+  search:        '',
+  sortKey:       'nome',
+  sortDir:       'asc',
+  cargoAtivo:    null,
+  isEditMode:    false,
+  viewMode:      'table',   // 'table' | 'cards' | 'compact'
+};
+
+// ── Utilitários ────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+let debounceTimer;
+function debouncedFetch() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => { state.search = $('search').value; renderView(); }, 280);
+}
+
+function toast(msg, tipo='') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'show ' + tipo;
+  setTimeout(() => t.className = '', 3200);
+}
+
+function saldoClass(s) {
+  return s > 0 ? 'saldo-pos' : s < 0 ? 'saldo-neg' : 'saldo-zer';
+}
+function saldoLabel(s) {
+  return (s > 0 ? '+' : '') + s;
+}
+function badgeSituacao(s) {
+  const cls = s === 'Em vigor' ? 'badge-vigor' : s === 'Extinto' ? 'badge-extinto' : 'badge-revogado';
+  return `<span class="badge ${cls}">${s}</span>`;
+}
+function badgeDelib(s) {
+  const cls = s === 'Enviado' ? 'badge-delib-env' : s === 'salvo - em revisão' ? 'badge-delib-salvo' : 'badge-delib-nao';
+  return `<span class="badge ${cls}">${s}</span>`;
+}
+
+// ── Carregar stats ─────────────────────────────────────────────────────────
+async function carregarStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    $('s-previstos').textContent = (d.total_previstos || 0).toLocaleString('pt-BR');
+    $('s-ocupados').textContent  = (d.total_ocupados  || 0).toLocaleString('pt-BR');
+    const saldo = d.total_saldo || 0;
+    $('s-saldo').textContent = saldo.toLocaleString('pt-BR');
+    $('s-saldo').style.color = saldo < 0 ? 'var(--danger-text)' : saldo === 0 ? 'var(--warning-text)' : 'var(--success-text)';
+    $('s-alertas').textContent = d.alertas || 0;
+  } catch(e) { console.error(e); }
+}
+
+// ── Carregar e renderizar cargos ───────────────────────────────────────────
+async function carregarCargos() {
+  try {
+    const params = new URLSearchParams();
+    if (state.filtroSituacao !== 'Todos') params.set('situacao', state.filtroSituacao);
+    if (state.filtroTipo     !== 'Todos') params.set('tipo', state.filtroTipo);
+    if (state.search)                     params.set('q', state.search);
+    const r = await fetch('/api/cargos?' + params);
+    state.cargos = await r.json();
+    renderView();
+  } catch(e) {
+    $('tbody').innerHTML = `<tr><td colspan="10" class="empty-state" style="color:var(--danger-text)">Erro ao carregar dados.</td></tr>`;
+  }
+}
+
+// ── Alternância de modo de visualização ───────────────────────────────────
+function setViewMode(mode) {
+  state.viewMode = mode;
+
+  // Atualiza botões de toggle
+  ['table','cards','compact'].forEach(m => {
+    $('vbtn-' + m).classList.toggle('active', m === mode);
+  });
+
+  // Mostra/oculta os containers
+  $('table-wrap').style.display   = mode === 'table'   ? '' : 'none';
+  $('cards-wrap').classList.toggle('visible', mode === 'cards');
+  $('compact-wrap').classList.toggle('visible', mode === 'compact');
+
+  renderView();
+}
+
+// Despacha para o render correto
+function renderView() {
+  if      (state.viewMode === 'table')   renderTabela();
+  else if (state.viewMode === 'cards')   renderCartoes();
+  else if (state.viewMode === 'compact') renderCompacto();
+}
+
+// Prepara a lista filtrada e ordenada (compartilhada pelos três modos)
+function prepararDados() {
+  const dados = [...state.cargos];
+  const q = state.search.toLowerCase();
+  const filtrados = q
+    ? dados.filter(c => c.nome.toLowerCase().includes(q) || (c.codigo_fopag||'').includes(q))
+    : dados;
+
+  filtrados.sort((a,b) => {
+    const va = a[state.sortKey] ?? '', vb = b[state.sortKey] ?? '';
+    const cmp = typeof va === 'number'
+      ? va - vb
+      : String(va).localeCompare(String(vb), 'pt-BR', {sensitivity:'base'});
+    return state.sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const label = `${filtrados.length} cargo${filtrados.length!==1?'s':''} encontrado${filtrados.length!==1?'s':''}`;
+  $('toolbar-count').textContent = label;
+  return filtrados;
+}
+
+function renderTabela() {
+  const filtrados = prepararDados();
+  $('table-count').textContent = `${filtrados.length} registro${filtrados.length!==1?'s':''}`;
+
+  if (!filtrados.length) {
+    $('tbody').innerHTML = `<tr><td colspan="10" class="empty-state">Nenhum cargo encontrado para os filtros selecionados.</td></tr>`;
+    return;
+  }
+
+  const rows = filtrados.map((c, i) => {
+    const saldo = c.saldo_vagas;
+    const ativo = state.cargoAtivo?.id === c.id;
+    return `
+      <tr class="data-row ${i%2===1?'odd':''} ${ativo?'selected':''}" onclick="abrirDrawer(${c.id})">
+        <td><span class="td-nome" title="${c.nome}">${c.nome}</span></td>
+        <td class="td-code">${c.codigo_fopag || '—'}</td>
+        <td>${badgeSituacao(c.situacao)}</td>
+        <td>${badgeDelib(c.situacao_delib || 'não enviado')}</td>
+        <td style="color:var(--text-secondary);font-size:12px">${c.tipo_provimento}</td>
+        <td class="td-center" style="color:var(--text-secondary);font-size:12px">${c.carga_horaria ? c.carga_horaria+'h' : '—'}</td>
+        <td class="td-num">${c.total_previstos}</td>
+        <td class="td-center" style="color:var(--text-secondary)">${c.total_ocupados}</td>
+        <td class="td-center"><span class="saldo-badge ${saldoClass(saldo)}">${saldoLabel(saldo)}</span></td>
+        <td class="td-center">
+          <button class="action-btn" onclick="event.stopPropagation();abrirDrawer(${c.id})" title="Ver detalhes">···</button>
+        </td>
+      </tr>`;
+  }).join('');
+
+  $('tbody').innerHTML = rows;
+}
+
+// ── Modo Cartões ───────────────────────────────────────────────────────────
+function renderCartoes() {
+  const filtrados = prepararDados();
+  $('cards-count').textContent = `${filtrados.length} cargo${filtrados.length!==1?'s':''}`;
+
+  if (!filtrados.length) {
+    $('cards-grid').innerHTML = `<div class="empty-state" style="grid-column:1/-1">Nenhum cargo encontrado para os filtros selecionados.</div>`;
+    return;
+  }
+
+  const topClass = { 'Em vigor': 'vigor', 'Extinto': 'extinto', 'Revogado': 'revogado' };
+
+  $('cards-grid').innerHTML = filtrados.map(c => {
+    const saldo    = c.saldo_vagas;
+    const ativo    = state.cargoAtivo?.id === c.id;
+    const saldoCls = saldo > 0 ? 'saldo-pos-card' : saldo < 0 ? 'saldo-neg-card' : 'saldo-zer-card';
+    const saldoVal = (saldo > 0 ? '+' : '') + saldo;
+    const tipoBadge = c.tipo_provimento === 'Comissão'
+      ? `<span class="badge" style="background:var(--warning-bg);color:var(--warning-text)">${c.tipo_provimento}</span>`
+      : `<span class="badge badge-vigor">${c.tipo_provimento}</span>`;
+
+    return `
+      <div class="cargo-card ${ativo ? 'selected' : ''}" onclick="abrirDrawer(${c.id})">
+        <div class="card-top ${topClass[c.situacao] || 'vigor'}"></div>
+        <div class="card-body">
+          <div class="card-nome" title="${c.nome}">${c.nome}</div>
+          <div class="card-badges">
+            ${badgeSituacao(c.situacao)}
+            ${tipoBadge}
+          </div>
+          <div class="card-metrics">
+            <div class="card-metric">
+              <span class="m-val">${c.total_previstos}</span>
+              <span class="m-lbl">Previstos</span>
+            </div>
+            <div class="card-metric">
+              <span class="m-val" style="color:var(--text-secondary)">${c.total_ocupados}</span>
+              <span class="m-lbl">Ocupados</span>
+            </div>
+            <div class="card-metric ${saldoCls}">
+              <span class="m-val">${saldoVal}</span>
+              <span class="m-lbl">Saldo</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-foot">
+          <span class="card-code">${c.codigo_fopag || '—'}</span>
+          <span class="card-ch">${c.carga_horaria ? c.carga_horaria + 'h' : ''}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Modo Compacto ──────────────────────────────────────────────────────────
+function renderCompacto() {
+  const filtrados = prepararDados();
+  $('compact-count').textContent = `${filtrados.length} registro${filtrados.length!==1?'s':''}`;
+
+  if (!filtrados.length) {
+    $('compact-list').innerHTML = `<div class="empty-state">Nenhum cargo encontrado para os filtros selecionados.</div>`;
+    return;
+  }
+
+  $('compact-list').innerHTML = filtrados.map((c, i) => {
+    const saldo  = c.saldo_vagas;
+    const ativo  = state.cargoAtivo?.id === c.id;
+    const altCls = i % 2 === 1 ? 'alt' : '';
+
+    return `
+      <div class="compact-row ${altCls} ${ativo ? 'selected' : ''}" onclick="abrirDrawer(${c.id})">
+        <span class="compact-nome" title="${c.nome}">${c.nome}</span>
+        <span class="compact-cell">${badgeSituacao(c.situacao)}</span>
+        <span class="compact-cell" style="font-size:11px;color:var(--text-secondary)">${c.tipo_provimento}</span>
+        <span class="compact-num">${c.total_previstos}</span>
+        <span class="compact-cell"><span class="saldo-badge ${saldoClass(saldo)}">${saldoLabel(saldo)}</span></span>
+        <span class="compact-actions">
+          <button class="action-btn" style="font-size:13px" onclick="event.stopPropagation();abrirDrawer(${c.id})" title="Ver detalhes">···</button>
+        </span>
+      </div>`;
+  }).join('');
+}
+
+// ── Ordenação ──────────────────────────────────────────────────────────────
+function sortBy(key) {
+  document.querySelectorAll('.sort-arrow').forEach(a => a.classList.add('hidden'));
+  if (state.sortKey === key) {
+    state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.sortKey = key; state.sortDir = 'asc';
+  }
+  const arrow = $('arrow-' + key);
+  if (arrow) { arrow.classList.remove('hidden'); arrow.textContent = state.sortDir === 'asc' ? '↑' : '↓'; }
+  renderView();
+}
+
+// ── Filtros ────────────────────────────────────────────────────────────────
+function setFiltro(campo, btn) {
+  const val = btn.dataset.val;
+  if (campo === 'situacao') state.filtroSituacao = val;
+  else                      state.filtroTipo     = val;
+
+  btn.closest('.filter-group').querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  carregarCargos();
+}
+
+// ── Drawer ─────────────────────────────────────────────────────────────────
+async function abrirDrawer(cargoId, force = false) {
+  if (!force && state.cargoAtivo && state.cargoAtivo.id === cargoId && $('drawer').classList.contains('open')) {
+    fecharDrawer();
+    return;
+  }
+  try {
+    const r = await fetch(`/api/cargos/${cargoId}`);
+    const d = await r.json();
+    const c = d.cargo;
+    state.cargoAtivo = c;
+
+    $('d-nome').textContent    = c.nome;
+    $('d-sub').textContent     = `${c.tipo_provimento} · ${c.situacao} · Cód. ${c.codigo_fopag||'—'}`;
+    $('d-fopag').textContent   = c.codigo_fopag || '—';
+    $('d-situacao').innerHTML  = badgeSituacao(c.situacao);
+    $('d-situacao_delib').innerHTML = badgeDelib(c.situacao_delib || 'não enviado');
+    $('d-tipo').textContent    = c.tipo_provimento;
+    $('d-ch').textContent      = c.carga_horaria ? c.carga_horaria + 'h' : '—';
+    $('d-simb').textContent    = c.simbolo_vencimento || '—';
+    $('d-esc').textContent     = c.escolaridade || '—';
+    $('d-prev').textContent    = c.total_previstos;
+    $('d-ocup').textContent    = c.total_ocupados;
+
+    const saldo = c.saldo_vagas;
+    $('d-saldo-num').textContent = saldoLabel(saldo);
+    $('d-saldo-num').style.color = saldo < 0 ? 'var(--danger-text)' : saldo === 0 ? 'var(--warning-text)' : 'var(--success-text)';
+    const saldoBox = $('d-saldo-box');
+    saldoBox.style.background = saldo < 0 ? 'var(--danger-bg)' : saldo === 0 ? 'var(--warning-bg)' : 'var(--success-bg)';
+    saldoBox.style.border = `1px solid ${saldo < 0 ? '#fecaca' : saldo === 0 ? '#fde68a' : '#a7f3d0'}`;
+
+    // Leis
+    const leisEl = $('d-leis');
+    if (d.leis.length === 0) {
+      leisEl.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:8px 0">Nenhuma lei vinculada.</div>`;
+    } else {
+      leisEl.innerHTML = d.leis.map(l => `
+        <div class="lei-row">
+          <div>
+            <div class="lei-num">Lei ${l.numero}/${l.ano}</div>
+            ${l.quantidade ? `<div style="font-size:11px;color:var(--text-secondary)">${l.acao} ${l.quantidade} vaga${l.quantidade!==1?'s':''}</div>` : ''}
+          </div>
+          <span class="lei-acao ${l.acao}">${l.acao}</span>
+        </div>`
+      ).join('');
+    }
+
+    $('drawer').classList.add('open');
+    renderView();
+  } catch(e) { toast('Erro ao carregar cargo.', 'err'); }
+}
+
+function fecharDrawer() {
+  $('drawer').classList.remove('open');
+  state.cargoAtivo = null;
+  renderView();
+}
+
+// ── Modal Lei ──────────────────────────────────────────────────────────────
+let cargoLeiId = null;
+
+function abrirModalLei() {
+  if (!state.cargoAtivo) return;
+  cargoLeiId = state.cargoAtivo.id;
+  $('ml-cargo-nome').textContent = 'Cargo: ' + state.cargoAtivo.nome;
+  $('ml-numero').value = '';
+  $('ml-ano').value = new Date().getFullYear();
+  $('ml-acao').value = 'Cria';
+  $('ml-quantidade').value = '';
+  $('ml-descricao').value = '';
+  atualizarPreview();
+  $('overlay-lei').classList.add('show');
+}
+
+function abrirModalLeiGlobal() {
+  if (!state.cargoAtivo) { toast('Selecione um cargo na tabela primeiro.','err'); return; }
+  abrirModalLei();
+}
+
+function fecharModalLei() { $('overlay-lei').classList.remove('show'); }
+
+function atualizarPreview() {
+  const acao = $('ml-acao').value;
+  const qtyGroup = $('ml-qty-group');
+  const preview  = $('ml-preview');
+  const ACOES_QTD = ['Cria','Extingue','Fixa'];
+
+  qtyGroup.style.display = ACOES_QTD.includes(acao) ? '' : 'none';
+
+  const labels = { Cria:'incremento', Extingue:'decremento', Fixa:'valor absoluto final' };
+  $('ml-qty-label').textContent = `Quantidade de Vagas${labels[acao] ? ` (${labels[acao]})` : ''}`;
+
+  if (!state.cargoAtivo || !ACOES_QTD.includes(acao)) { preview.style.display='none'; return; }
+  const qty = parseInt($('ml-quantidade').value);
+  if (isNaN(qty)) { preview.style.display='none'; return; }
+
+  const prev = state.cargoAtivo.total_previstos;
+  const ocup = state.cargoAtivo.total_ocupados;
+  let novoPrev = prev;
+  if (acao === 'Cria')     novoPrev = prev + qty;
+  if (acao === 'Extingue') novoPrev = Math.max(0, prev - qty);
+  if (acao === 'Fixa')     novoPrev = qty;
+  const novoSaldo = novoPrev - ocup;
+
+  preview.style.display = '';
+  preview.innerHTML = `<strong>Impacto calculado:</strong> Total previstos passa de <strong>${prev}</strong> → <strong>${novoPrev}</strong>. Saldo passará para <strong>${novoSaldo > 0 ? '+' : ''}${novoSaldo}</strong>.`;
+}
+
+async function submitLei() {
+  const numero = $('ml-numero').value.trim();
+  const ano    = parseInt($('ml-ano').value);
+  const acao   = $('ml-acao').value;
+  const qty    = parseInt($('ml-quantidade').value);
+  const desc   = $('ml-descricao').value.trim();
+
+  if (!numero || !ano) { toast('Preencha número e ano da lei.','err'); return; }
+  if (['Cria','Extingue','Fixa'].includes(acao) && isNaN(qty)) {
+    toast(`Ação "${acao}" exige quantidade.`,'err'); return;
+  }
+
+  try {
+    const body = { numero, ano, acao, quantidade: isNaN(qty) ? null : qty, descricao: desc || null };
+    const r = await fetch(`/api/cargos/${cargoLeiId}/leis`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Erro ao registrar lei');
+    fecharModalLei();
+    toast(d.mensagem, 'ok');
+    await abrirDrawer(cargoLeiId, true);   // force=true: atualiza sem fechar
+    await carregarStats();
+    carregarCargos();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// ── Modal Novo / Editar Cargo ───────────────────────────────────────────────────
+function abrirModalNovoCargo() {
+  state.isEditMode = false;
+  $('mc-title').textContent = 'Novo Cargo';
+  ['nc-nome','nc-fopag','nc-simb','nc-esc','nc-atr'].forEach(id => $(id).value = '');
+  $('nc-situacao').value = 'Em vigor';
+  $('nc-situacao-delib').value = 'não enviado';
+  $('nc-tipo').value = 'Efetivo';
+  $('nc-ch').value = '';
+  $('nc-prev').value = 0;
+  $('nc-ocup').value = 0;
+  $('overlay-cargo').classList.add('show');
+}
+
+function abrirModalCargoEdicao() {
+  if (!state.cargoAtivo) return;
+  state.isEditMode = true;
+  $('mc-title').textContent = 'Editar Cargo';
+  $('nc-nome').value = state.cargoAtivo.nome || '';
+  $('nc-fopag').value = state.cargoAtivo.codigo_fopag || '';
+  $('nc-situacao').value = state.cargoAtivo.situacao || 'Em vigor';
+  $('nc-situacao-delib').value = state.cargoAtivo.situacao_delib || 'não enviado';
+  $('nc-tipo').value = state.cargoAtivo.tipo_provimento || 'Efetivo';
+  $('nc-ch').value = state.cargoAtivo.carga_horaria || '';
+  $('nc-esc').value = state.cargoAtivo.escolaridade || '';
+  $('nc-simb').value = state.cargoAtivo.simbolo_vencimento || '';
+  $('nc-prev').value = state.cargoAtivo.total_previstos || 0;
+  $('nc-ocup').value = state.cargoAtivo.total_ocupados || 0;
+  $('nc-atr').value = state.cargoAtivo.atribuicoes || '';
+  
+  $('overlay-cargo').classList.add('show');
+}
+
+function fecharModalCargo() { $('overlay-cargo').classList.remove('show'); }
+
+async function submitCargo() {
+  const nome = $('nc-nome').value.trim();
+  if (!nome) { toast('Nome do cargo é obrigatório.','err'); return; }
+  const body = {
+    nome, 
+    codigo_fopag: $('nc-fopag').value.trim() || null,
+    situacao: $('nc-situacao').value, 
+    situacao_delib: $('nc-situacao-delib').value,
+    tipo_provimento: $('nc-tipo').value,
+    escolaridade: $('nc-esc').value.trim() || null,
+    carga_horaria: $('nc-ch').value || null,
+    simbolo_vencimento: $('nc-simb').value.trim() || null,
+    total_previstos: parseInt($('nc-prev').value) || 0,
+    total_ocupados:  parseInt($('nc-ocup').value) || 0,
+    atribuicoes: $('nc-atr').value.trim() || null,
+  };
+  try {
+    let url = '/api/cargos';
+    let method = 'POST';
+    if (state.isEditMode && state.cargoAtivo) {
+        url = `/api/cargos/${state.cargoAtivo.id}`;
+        method = 'PUT';
+    }
+
+    const r = await fetch(url, {
+      method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Erro ao salvar cargo');
+    fecharModalCargo();
+    toast(`Cargo ${state.isEditMode ? 'atualizado' : 'criado'} com sucesso!`, 'ok');
+    
+    if (state.isEditMode && state.cargoAtivo) {
+        await abrirDrawer(state.cargoAtivo.id);
+    }
+    carregarCargos(); carregarStats();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// ── Modal Ocupados ─────────────────────────────────────────────────────────
+function abrirModalOcupados() {
+  if (!state.cargoAtivo) return;
+  $('mo-nome').textContent = state.cargoAtivo.nome;
+  $('mo-ocupados').value = state.cargoAtivo.total_ocupados;
+  $('overlay-ocup').classList.add('show');
+}
+function fecharModalOcupados() { $('overlay-ocup').classList.remove('show'); }
+
+async function submitOcupados() {
+  const val = parseInt($('mo-ocupados').value);
+  if (isNaN(val) || val < 0) { toast('Valor inválido.','err'); return; }
+  try {
+    const r = await fetch(`/api/cargos/${state.cargoAtivo.id}/ocupados`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({total_ocupados: val})
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Erro');
+    fecharModalOcupados();
+    toast(`Atualizado. Novo saldo: ${d.saldo_novo > 0 ? '+' : ''}${d.saldo_novo}`, 'ok');
+    await abrirDrawer(state.cargoAtivo.id);
+    carregarStats(); carregarCargos();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// ── Navegação de views ─────────────────────────────────────────────────────
+async function gerarRelatorioPDF() {
+  if (!state.cargoAtivo) { toast('Selecione um cargo primeiro.', 'err'); return; }
+  try {
+    const r = await fetch(`/api/cargos/${state.cargoAtivo.id}/relatorio`);
+    if (!r.ok) throw new Error('Erro ao gerar relatório');
+    const blob = await r.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    // Extrai filename do header Content-Disposition se disponível
+    const disp = r.headers.get('content-disposition');
+    let fname = `Relatorio_FOPAG_${state.cargoAtivo.nome.replace(/[^\w\s-]/g,'').replace(/\s+/g,'_')}.pdf`;
+    if (disp) {
+      const m = disp.match(/filename\*?=(?:UTF-8'')?"?([^"]+)"?/);
+      if (m) fname = decodeURIComponent(m[1]);
+    }
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    toast('Relatório gerado com sucesso!', 'ok');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+function atualizarBotoesFiltro() {
+  document.querySelectorAll('#fg-situacao .filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === state.filtroSituacao);
+  });
+  document.querySelectorAll('#fg-tipo .filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === state.filtroTipo);
+  });
+}
+
+function setView(v, btn) {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  btn.querySelector('.nav-dot') || btn.insertAdjacentHTML('beforeend','<span class="nav-dot"></span>');
+  document.querySelectorAll('.nav-item:not(.active) .nav-dot').forEach(d => d.remove());
+  
+  if (v === 'alertas') {
+    state.filtroSituacao = 'Todos'; state.filtroTipo = 'Todos';
+    state.sortKey = 'saldo_vagas'; state.sortDir = 'asc';
+    atualizarBotoesFiltro();
+    carregarCargos();
+  } else if (v === 'quadro') {
+    state.filtroSituacao = 'Todos'; state.filtroTipo = 'Todos';
+    state.sortKey = 'nome'; state.sortDir = 'asc';
+    state.search = '';
+    $('search').value = '';
+    atualizarBotoesFiltro();
+    carregarCargos();
+  } else if (v === 'leis') {
+    toast('Selecione um cargo na tabela para visualizar ou registrar suas leis.', 'ok');
+  }
+}
+
+// ── Teclado ────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { fecharDrawer(); fecharModalLei(); fecharModalCargo(); fecharModalOcupados(); }
+});
+
+// ── Inicialização ──────────────────────────────────────────────────────────
+(async () => {
+  await carregarStats();
+  await carregarCargos();
+})();
+
+// Atualiza stats a cada 60s
+setInterval(carregarStats, 60000);
+</script>
+</body>
+</html>

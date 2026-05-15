@@ -1229,6 +1229,7 @@ async function abrirDrawer(cargoId, force = false) {
     const r = await fetch(`/api/cargos/${cargoId}`);
     const d = await r.json();
     const c = d.cargo;
+    c.leis = d.leis;
     state.cargoAtivo = c;
 
     $('d-nome').textContent    = c.nome;
@@ -1256,12 +1257,16 @@ async function abrirDrawer(cargoId, force = false) {
       leisEl.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:8px 0">Nenhuma lei vinculada.</div>`;
     } else {
       leisEl.innerHTML = d.leis.map(l => `
-        <div class="lei-row">
-          <div>
+        <div class="lei-row" style="justify-content: space-between; align-items: center">
+          <div style="flex:1">
             <div class="lei-num">Lei ${l.numero}/${l.ano}</div>
             ${l.quantidade ? `<div style="font-size:11px;color:var(--text-secondary)">${l.acao} ${l.quantidade} vaga${l.quantidade!==1?'s':''}</div>` : ''}
           </div>
-          <span class="lei-acao ${l.acao}">${l.acao}</span>
+          <div style="display:flex; gap:4px; align-items:center;">
+            <span class="lei-acao ${l.acao}">${l.acao}</span>
+            <button class="action-btn" style="font-size:12px" onclick="abrirModalLeiEdicao(${l.id})" title="Editar Lei">✏️</button>
+            <button class="action-btn" style="color:var(--danger-text); font-size:12px" onclick="deletarLei(${l.id})" title="Excluir Lei">🗑️</button>
+          </div>
         </div>`
       ).join('');
     }
@@ -1279,10 +1284,12 @@ function fecharDrawer() {
 
 // ── Modal Lei ──────────────────────────────────────────────────────────────
 let cargoLeiId = null;
+let editLeiId = null;
 
 function abrirModalLei() {
   if (!state.cargoAtivo) return;
   cargoLeiId = state.cargoAtivo.id;
+  editLeiId = null;
   $('ml-cargo-nome').textContent = 'Cargo: ' + state.cargoAtivo.nome;
   $('ml-numero').value = '';
   $('ml-ano').value = new Date().getFullYear();
@@ -1291,6 +1298,35 @@ function abrirModalLei() {
   $('ml-descricao').value = '';
   atualizarPreview();
   $('overlay-lei').classList.add('show');
+}
+
+function abrirModalLeiEdicao(leiId) {
+  if (!state.cargoAtivo) return;
+  const lei = state.cargoAtivo.leis.find(l => l.id === leiId);
+  if (!lei) return;
+  cargoLeiId = state.cargoAtivo.id;
+  editLeiId = leiId;
+  $('ml-cargo-nome').textContent = 'Editando Lei - Cargo: ' + state.cargoAtivo.nome;
+  $('ml-numero').value = lei.numero;
+  $('ml-ano').value = lei.ano;
+  $('ml-acao').value = lei.acao;
+  $('ml-quantidade').value = lei.quantidade || '';
+  $('ml-descricao').value = lei.descricao || '';
+  atualizarPreview();
+  $('overlay-lei').classList.add('show');
+}
+
+async function deletarLei(leiId) {
+  if (!confirm("Tem certeza que deseja excluir esta lei? O impacto nas vagas será desfeito.")) return;
+  try {
+    const r = await fetch(`/api/cargos/${state.cargoAtivo.id}/leis/${leiId}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Erro ao excluir lei');
+    toast(d.mensagem, 'ok');
+    await abrirDrawer(state.cargoAtivo.id, true);
+    await carregarStats();
+    carregarCargos();
+  } catch(e) { toast(e.message, 'err'); }
 }
 
 function abrirModalLeiGlobal() {
@@ -1341,8 +1377,14 @@ async function submitLei() {
 
   try {
     const body = { numero, ano, acao, quantidade: isNaN(qty) ? null : qty, descricao: desc || null };
-    const r = await fetch(`/api/cargos/${cargoLeiId}/leis`, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    let url = `/api/cargos/${cargoLeiId}/leis`;
+    let method = 'POST';
+    if (editLeiId) {
+       url = `/api/cargos/${cargoLeiId}/leis/${editLeiId}`;
+       method = 'PUT';
+    }
+    const r = await fetch(url, {
+      method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || 'Erro ao registrar lei');

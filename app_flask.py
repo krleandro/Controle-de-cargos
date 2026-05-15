@@ -242,6 +242,95 @@ def registrar_lei(cargo_id):
     finally:
         con.close()
 
+@app.route("/api/cargos/<int:cargo_id>/leis/<int:lei_id>", methods=["PUT"])
+def atualizar_lei(cargo_id, lei_id):
+    """Atualiza uma lei pertinente."""
+    lei = request.get_json()
+    ACOES_COM_QTD = {"Cria", "Extingue", "Fixa"}
+    ACOES_VALIDAS = {"Cria", "Extingue", "Fixa", "Altera", "Regulamenta", "Outro"}
+    
+    acao = lei.get("acao")
+    quantidade = lei.get("quantidade")
+
+    if acao not in ACOES_VALIDAS:
+        abort(400, description=f"Ação inválida: {acao}")
+    if acao in ACOES_COM_QTD and quantidade is None:
+        abort(400, description=f"Ação '{acao}' exige o campo 'quantidade'.")
+
+    con = get_db_connection()
+    try:
+        # Pega a lei antiga para reverter o impacto no cargo
+        lei_antiga = con.execute("SELECT acao, quantidade FROM LeisPertinentes WHERE id=? AND cargo_id=?", (lei_id, cargo_id)).fetchone()
+        if not lei_antiga:
+            abort(404, description="Lei não encontrada")
+
+        cargo = con.execute("SELECT id, total_previstos, total_ocupados FROM Cargos WHERE id=?", (cargo_id,)).fetchone()
+        
+        # Desfaz o impacto da lei antiga
+        prev_atual = cargo["total_previstos"]
+        acao_antiga = lei_antiga["acao"]
+        qtd_antiga = lei_antiga["quantidade"] or 0
+        
+        if acao_antiga == "Cria":
+            prev_atual = max(0, prev_atual - qtd_antiga)
+        elif acao_antiga == "Extingue":
+            prev_atual = prev_atual + qtd_antiga
+        # Se era "Fixa", não temos como saber o valor anterior, então ignoramos o desfazimento.
+
+        # Aplica o impacto da nova lei
+        if acao == "Cria":
+            novo_prev = prev_atual + quantidade
+        elif acao == "Extingue":
+            novo_prev = max(0, prev_atual - quantidade)
+        elif acao == "Fixa":
+            novo_prev = quantidade
+        else:
+            novo_prev = prev_atual
+
+        if novo_prev != cargo["total_previstos"]:
+            con.execute("UPDATE Cargos SET total_previstos=? WHERE id=?", (novo_prev, cargo_id))
+
+        con.execute("""
+            UPDATE LeisPertinentes SET
+              numero=?, ano=?, descricao=?, acao=?, quantidade=?
+            WHERE id=? AND cargo_id=?
+        """, (lei.get("numero"), lei.get("ano"), lei.get("descricao"), acao,
+              quantidade if acao in ACOES_COM_QTD else None, lei_id, cargo_id))
+              
+        con.commit()
+        return jsonify({"mensagem": "Lei atualizada com sucesso."})
+    finally:
+        con.close()
+
+@app.route("/api/cargos/<int:cargo_id>/leis/<int:lei_id>", methods=["DELETE"])
+def deletar_lei(cargo_id, lei_id):
+    """Deleta uma lei pertinente."""
+    con = get_db_connection()
+    try:
+        lei_antiga = con.execute("SELECT acao, quantidade FROM LeisPertinentes WHERE id=? AND cargo_id=?", (lei_id, cargo_id)).fetchone()
+        if not lei_antiga:
+            abort(404, description="Lei não encontrada")
+
+        cargo = con.execute("SELECT id, total_previstos FROM Cargos WHERE id=?", (cargo_id,)).fetchone()
+        
+        prev_atual = cargo["total_previstos"]
+        acao_antiga = lei_antiga["acao"]
+        qtd_antiga = lei_antiga["quantidade"] or 0
+        
+        if acao_antiga == "Cria":
+            prev_atual = max(0, prev_atual - qtd_antiga)
+        elif acao_antiga == "Extingue":
+            prev_atual = prev_atual + qtd_antiga
+
+        if prev_atual != cargo["total_previstos"]:
+            con.execute("UPDATE Cargos SET total_previstos=? WHERE id=?", (prev_atual, cargo_id))
+
+        con.execute("DELETE FROM LeisPertinentes WHERE id=? AND cargo_id=?", (lei_id, cargo_id))
+        con.commit()
+        return jsonify({"mensagem": "Lei excluída com sucesso."})
+    finally:
+        con.close()
+
 @app.route("/api/cargos/<int:cargo_id>/leis", methods=["GET"])
 def listar_leis(cargo_id):
     con = get_db_connection()

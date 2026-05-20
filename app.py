@@ -4,7 +4,7 @@ from datetime import datetime
 
 from flask import Flask, request, jsonify, send_file, render_template, abort
 
-from relatorio_pdf import gerar_relatorio
+from relatorio_pdf import gerar_relatorio, gerar_relatorio_consolidado
 
 # ── Caminhos ──────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent
@@ -382,6 +382,107 @@ def baixar_relatorio(cargo_id):
         as_attachment=True,
         download_name=filename
     )
+
+@app.route("/api/relatorios/estatisticas", methods=["GET"])
+def relatorios_estatisticas():
+    con = get_db_connection()
+    try:
+        # KPIs gerais
+        res_stats = con.execute("""
+            SELECT
+              COUNT(*)                                           AS total_cargos,
+              COALESCE(SUM(total_previstos), 0)                 AS total_previstos,
+              COALESCE(SUM(total_ocupados), 0)                  AS total_ocupados,
+              COALESCE(SUM(saldo_vagas), 0)                     AS total_saldo,
+              SUM(CASE WHEN saldo_vagas < 0 THEN 1 ELSE 0 END)  AS alertas
+            FROM vw_SaldoVagas
+        """).fetchone()
+        
+        stats = dict(res_stats)
+        
+        # Estatísticas de provimento
+        res_prov = con.execute("""
+            SELECT
+              tipo_provimento                                    AS tipo,
+              COUNT(*)                                           AS qtd_cargos,
+              COALESCE(SUM(total_previstos), 0)                 AS total_previstos,
+              COALESCE(SUM(total_ocupados), 0)                  AS total_ocupados
+            FROM vw_SaldoVagas
+            GROUP BY tipo_provimento
+            ORDER BY tipo_provimento
+        """).fetchall()
+        
+        prov_stats = [dict(r) for r in res_prov]
+        
+        # Cargos críticos (saldo negativo ou zerado)
+        res_criticos = con.execute("""
+            SELECT * FROM vw_SaldoVagas
+            WHERE saldo_vagas <= 0
+            ORDER BY saldo_vagas ASC, nome COLLATE NOCASE
+        """).fetchall()
+        
+        cargos_criticos = [dict(r) for r in res_criticos]
+        
+        return jsonify({
+            "stats": stats,
+            "prov_stats": prov_stats,
+            "cargos_criticos": cargos_criticos
+        })
+    finally:
+        con.close()
+
+@app.route("/api/relatorios/consolidado", methods=["GET"])
+def relatorios_consolidado():
+    con = get_db_connection()
+    try:
+        # KPIs gerais
+        res_stats = con.execute("""
+            SELECT
+              COUNT(*)                                           AS total_cargos,
+              COALESCE(SUM(total_previstos), 0)                 AS total_previstos,
+              COALESCE(SUM(total_ocupados), 0)                  AS total_ocupados,
+              COALESCE(SUM(saldo_vagas), 0)                     AS total_saldo,
+              SUM(CASE WHEN saldo_vagas < 0 THEN 1 ELSE 0 END)  AS alertas
+            FROM vw_SaldoVagas
+        """).fetchone()
+        
+        stats = dict(res_stats)
+        
+        # Estatísticas de provimento
+        res_prov = con.execute("""
+            SELECT
+              tipo_provimento                                    AS tipo,
+              COUNT(*)                                           AS qtd_cargos,
+              COALESCE(SUM(total_previstos), 0)                 AS total_previstos,
+              COALESCE(SUM(total_ocupados), 0)                  AS total_ocupados
+            FROM vw_SaldoVagas
+            GROUP BY tipo_provimento
+            ORDER BY tipo_provimento
+        """).fetchall()
+        
+        prov_stats = [dict(r) for r in res_prov]
+        
+        # Todos os cargos ordenados alfabeticamente para a listagem
+        res_cargos = con.execute("SELECT * FROM vw_SaldoVagas ORDER BY nome COLLATE NOCASE").fetchall()
+        cargos = [dict(r) for r in res_cargos]
+    finally:
+        con.close()
+        
+    import io
+    try:
+        pdf_bytes = gerar_relatorio_consolidado(stats, prov_stats, cargos)
+    except Exception as e:
+        abort(500, description=f"Erro ao gerar PDF Consolidado: {e}")
+        
+    filename = f"Relatorio_Consolidado_FOPAG_{datetime.now().strftime('%Y%m%d')}.pdf"
+    
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename
+    )
+
 
 @app.route("/api/backup", methods=["GET"])
 def fazer_backup():

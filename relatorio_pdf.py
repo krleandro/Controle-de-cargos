@@ -662,6 +662,7 @@ class RelatorioCargoPDF(FPDF):
     def _pagina_conteudo(self, cargo: Dict[str, Any], leis: List[Dict[str, Any]], fontes: List[Dict[str, Any]]):
         """Monta as páginas de conteúdo após a capa."""
         self.add_page()
+        self.set_y(self.t_margin)
         # Reativa auto page break para o resto do documento após iniciar a página de conteúdo
         self.set_auto_page_break(auto=True, margin=25)
 
@@ -759,4 +760,426 @@ def gerar_relatorio(cargo: dict, leis: list, fontes: list) -> bytes:
     """Gera o PDF e retorna os bytes prontos para download."""
     pdf = RelatorioCargoPDF()
     pdf.montar(cargo, leis, fontes)
+    return bytes(pdf.output(dest="S"))
+
+
+class RelatorioConsolidadoPDF(FPDF):
+    """PDF A4 para relatório gerencial consolidado do quadro de pessoal."""
+
+    FONT_FAMILY = "Roboto"
+    PAGE_W   = 210
+    MARGIN_X = 20
+    CONTENT_W = 170  # PAGE_W - 2*MARGIN_X
+
+    def __init__(self):
+        super().__init__(unit="mm", format="A4")
+        self.set_auto_page_break(auto=True, margin=25)
+        self.set_margins(left=self.MARGIN_X, top=32, right=self.MARGIN_X)
+        self.alias_nb_pages("{nb}")
+        self._setup_fonts()
+
+    def _setup_fonts(self):
+        import os
+        base_dir = os.path.dirname(__file__)
+        self.add_font("Roboto", "", os.path.join(base_dir, "Roboto-Regular.ttf"))
+        self.add_font("Roboto", "B", os.path.join(base_dir, "Roboto-Bold.ttf"))
+        self.add_font("Roboto", "I", os.path.join(base_dir, "Roboto-Italic.ttf"))
+
+    def _set_font(self, style="", size=11):
+        self.set_font(self.FONT_FAMILY, style, size)
+
+    def header(self):
+        if self.page == 1:
+            return
+
+        # Faixa azul escura no topo
+        self.set_fill_color(*AZUL_INST)
+        self.rect(x=0, y=0, w=self.PAGE_W, h=7, style="F")
+
+        # Linha de acento dourada fina abaixo da faixa
+        self.set_fill_color(*DOURADO)
+        self.rect(x=0, y=7, w=self.PAGE_W, h=0.8, style="F")
+
+        # Texto do header
+        self.set_xy(self.MARGIN_X, 10)
+        self._set_font("B", 9)
+        self.set_text_color(*AZUL_MEDIO)
+        self.cell(w=30, h=5, txt="FOPAG", ln=0)
+
+        self._set_font("", 7.5)
+        self.set_text_color(*CINZA_500)
+        self.cell(w=90, h=5, txt="Relatório Gerencial Consolidado", ln=0)
+
+        # Direita: data
+        self._set_font("I", 7.5)
+        self.set_text_color(*CINZA_400)
+        agora = datetime.now().strftime("%d/%m/%Y")
+        self.cell(w=0, h=5, txt=agora, ln=1, align="R")
+
+        self.set_x(self.MARGIN_X)
+        self._set_font("", 7)
+        self.set_text_color(*CINZA_400)
+        self.cell(w=0, h=4, txt="Prefeitura Municipal de Miracema", ln=1)
+
+        # Linha separadora sutil
+        self.set_draw_color(*CINZA_200)
+        self.set_line_width(0.15)
+        self.line(self.MARGIN_X, 28, self.PAGE_W - self.MARGIN_X, 28)
+
+    def footer(self):
+        if self.page == 1:
+            return
+
+        self.set_y(-18)
+
+        # Linha fina acima
+        self.set_draw_color(*CINZA_200)
+        self.set_line_width(0.15)
+        self.line(self.MARGIN_X, self.get_y(), self.PAGE_W - self.MARGIN_X, self.get_y())
+        self.ln(2.5)
+
+        self._set_font("", 7)
+        self.set_text_color(*CINZA_400)
+        agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+        self.cell(w=0, h=5, txt=f"FOPAG — Relatório Gerencial · Gerado em {agora}",
+                  ln=0, align="L")
+        self.cell(w=0, h=5, txt=f"Página {self.page_no()} de {{nb}}", ln=0, align="R")
+
+    def _section_title(self, title: str):
+        """Título de seção com fundo azul suave e barra à esquerda."""
+        if self.get_y() > (self.h - 45):
+            self.add_page()
+
+        self.ln(2)
+        y = self.get_y()
+        h = 8.0
+
+        self.set_fill_color(*AZUL_SUAVE)
+        self.rect(x=self.MARGIN_X, y=y, w=self.CONTENT_W, h=h, style="F")
+
+        self.set_fill_color(*AZUL_MEDIO)
+        self.rect(x=self.MARGIN_X, y=y, w=2.5, h=h, style="F")
+
+        self.set_xy(self.MARGIN_X + 6, y + 1.2)
+        self._set_font("B", 9)
+        self.set_text_color(*AZUL_INST)
+        self.cell(w=0, h=h - 2.4, txt=title.upper(), ln=1)
+        self.ln(2)
+
+    def _capa(self, stats: dict):
+        """Renderiza a página de capa institucional do relatório gerencial."""
+        self.add_page()
+        self.set_auto_page_break(auto=False, margin=0)
+        PAGE_H = 297
+
+        # Faixa azul escura no topo
+        self.set_fill_color(*AZUL_INST)
+        self.rect(x=0, y=0, w=self.PAGE_W, h=65, style="F")
+
+        # Detalhes geométricos no banner superior
+        self.set_fill_color(30, 80, 150)
+        self.polygon([(120, 0), (210, 0), (210, 65), (150, 65)], style="F")
+        self.set_fill_color(40, 95, 175)
+        self.polygon([(160, 0), (210, 0), (210, 65), (185, 65)], style="F")
+
+        # Linha dourada abaixo da faixa
+        self.set_fill_color(*DOURADO)
+        self.rect(x=0, y=65, w=self.PAGE_W, h=1.5, style="F")
+
+        # Título principal
+        self.set_xy(self.MARGIN_X, 15)
+        self._set_font("B", 30)
+        self.set_text_color(*BRANCO)
+        self.cell(w=120, h=12, txt="FOPAG", align="L", ln=1)
+
+        self.set_x(self.MARGIN_X)
+        self._set_font("", 10)
+        self.set_text_color(190, 215, 255)
+        self.cell(w=120, h=6, txt="GESTÃO DO QUADRO DE PESSOAL E VAGAS", align="L", ln=1)
+
+        self.set_x(self.MARGIN_X)
+        self._set_font("I", 8)
+        self.set_text_color(150, 185, 230)
+        self.cell(w=120, h=5, txt="Prefeitura Municipal de Miracema", align="L", ln=1)
+
+        # Conteúdo Central da Capa
+        self.set_xy(0, 95)
+        self._set_font("B", 20)
+        self.set_text_color(*AZUL_INST)
+        self.cell(w=self.PAGE_W, h=10, txt="RELATÓRIO GERENCIAL CONSOLIDADO", align="C", ln=1)
+
+        self.ln(2)
+        cx = self.PAGE_W / 2
+        self.set_draw_color(*DOURADO)
+        self.set_line_width(0.6)
+        self.line(cx - 40, self.get_y(), cx + 40, self.get_y())
+        self.ln(6)
+
+        self._set_font("", 9)
+        self.set_text_color(*CINZA_500)
+        self.cell(w=self.PAGE_W, h=6, txt="ESTATÍSTICAS, CRONOLOGIA LEGISLATIVA E SALDO DE VAGAS", align="C", ln=1)
+
+        # Painel central de dados quantitativos gerais
+        panel_y = 125
+        panel_h = 42
+        panel_w = self.CONTENT_W - 20
+        panel_x = self.MARGIN_X + 10
+
+        # Sombra
+        self.set_fill_color(220, 228, 240)
+        self.rect(panel_x + 1.5, panel_y + 1.5, panel_w, panel_h, style="F")
+
+        # Card principal
+        self.set_fill_color(*BRANCO)
+        self.set_draw_color(*CINZA_200)
+        self.set_line_width(0.3)
+        self.rect(panel_x, panel_y, panel_w, panel_h, style="FD")
+        self.set_fill_color(*AZUL_MEDIO)
+        self.rect(panel_x, panel_y, panel_w, 2.5, style="F")
+
+        col_w = panel_w / 3
+        prev = stats.get("total_previstos", 0)
+        ocup = stats.get("total_ocupados", 0)
+        saldo = stats.get("total_saldo", prev - ocup)
+
+        metrics = [
+            ("VAGAS PREVISTAS", str(prev), CINZA_500, CINZA_900),
+            ("VAGAS OCUPADAS", str(ocup), CINZA_500, CINZA_900),
+            ("SALDO GERAL", f"{saldo:+d}", AZUL_MEDIO if saldo >= 0 else VERMELHO_ESC, AZUL_MEDIO if saldo >= 0 else VERMELHO_ESC),
+        ]
+
+        for i, (lbl, val, lbl_col, val_col) in enumerate(metrics):
+            cx_col = panel_x + i * col_w
+            cy_lbl = panel_y + 8
+
+            if i > 0:
+                self.set_draw_color(*CINZA_200)
+                self.set_line_width(0.2)
+                self.line(cx_col, panel_y + 6, cx_col, panel_y + panel_h - 6)
+
+            self.set_xy(cx_col + 2, cy_lbl)
+            self._set_font("", 7)
+            self.set_text_color(*lbl_col)
+            self.cell(w=col_w - 4, h=4, txt=lbl, ln=1, align="C")
+
+            self.set_x(cx_col + 2)
+            self._set_font("B", 24)
+            self.set_text_color(*val_col)
+            self.cell(w=col_w - 4, h=14, txt=val, ln=1, align="C")
+
+        # Informações adicionais
+        total_c = stats.get("total_cargos", 0)
+        alertas = stats.get("alertas", 0)
+        taxa_ocup = (ocup / prev * 100) if prev > 0 else 0
+
+        self.set_xy(self.MARGIN_X, 185)
+        self.set_draw_color(*CINZA_200)
+        self.set_line_width(0.15)
+        self.line(self.MARGIN_X, 182, self.PAGE_W - self.MARGIN_X, 182)
+
+        self._set_font("", 8)
+        self.set_text_color(*CINZA_500)
+        self.cell(w=50, h=6, txt="Cargos Cadastrados:", ln=0)
+        self._set_font("B", 9)
+        self.set_text_color(*CINZA_900)
+        self.cell(w=30, h=6, txt=str(total_c), ln=0)
+
+        self._set_font("", 8)
+        self.set_text_color(*CINZA_500)
+        self.cell(w=50, h=6, txt="Taxa de Provimento (Ocupação):", ln=0)
+        self._set_font("B", 9)
+        self.set_text_color(*CINZA_900)
+        self.cell(w=30, h=6, txt=f"{taxa_ocup:.1f}%", ln=1)
+
+        self.set_x(self.MARGIN_X)
+        self._set_font("", 8)
+        self.set_text_color(*CINZA_500)
+        self.cell(w=50, h=6, txt="Alertas Críticos (Déficit):", ln=0)
+        self._set_font("B", 9)
+        self.set_text_color(*VERMELHO_ESC if alertas > 0 else CINZA_900)
+        self.cell(w=30, h=6, txt=f"{alertas} cargo(s)", ln=0)
+
+        # Rodapé da Capa
+        self.set_fill_color(*AZUL_INST)
+        self.rect(x=0, y=PAGE_H - 18, w=self.PAGE_W, h=18, style="F")
+        self.set_fill_color(*DOURADO)
+        self.rect(x=0, y=PAGE_H - 18, w=self.PAGE_W, h=0.8, style="F")
+
+        # Detalhe geométrico no rodapé correspondente ao topo
+        self.set_fill_color(30, 80, 150)
+        self.polygon([(150, PAGE_H - 18), (210, PAGE_H - 18), (210, PAGE_H), (165, PAGE_H)], style="F")
+
+        self.set_xy(self.MARGIN_X, PAGE_H - 13)
+        self._set_font("", 7.5)
+        self.set_text_color(180, 210, 255)
+        agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+        self.cell(w=0, h=5, txt=f"Relatório consolidado gerado em {agora} · Prefeitura de Miracema",
+                  align="C", ln=0)
+
+    def _pagina_visao_geral(self, stats: dict, prov_stats: List[dict]):
+        """Renderiza a página de visão geral e distribuição de provimento."""
+        self.add_page()
+        self.set_y(self.t_margin)
+        self.set_auto_page_break(auto=True, margin=25)
+
+        self._set_font("B", 14)
+        self.set_text_color(*CINZA_900)
+        self.cell(w=0, h=8, txt="1. Visão Geral e Análise Comparativa", ln=1)
+        self.ln(2)
+
+        # Bloco descritivo
+        self._set_font("", 8.5)
+        self.set_text_color(*CINZA_600)
+        desc = ("Este relatório apresenta a consolidação gerencial do Quadro de Pessoal da Prefeitura Municipal. "
+                "Os dados refletem o total de vagas criadas por lei (previstas), as vagas atualmente providas (ocupadas) "
+                "e o saldo disponível para contratação direta ou concurso público. Os quantitativos são atualizados em "
+                "tempo real com base nos registros do sistema FOPAG.")
+        self.multi_cell(w=self.CONTENT_W, h=4.5, txt=desc, ln=1)
+        self.ln(4)
+
+        # Seção comparativa
+        self._section_title("Distribuição do Quadro por Tipo de Provimento")
+
+        # Tabela com dados por tipo de provimento
+        heading_face = FontFace(emphasis="B", color=BRANCO, fill_color=AZUL_INST)
+        col_widths = (45, 25, 30, 30, 40)
+        self._set_font("", 8)
+
+        with self.table(
+            col_widths=col_widths,
+            text_align=("LEFT", "CENTER", "CENTER", "CENTER", "CENTER"),
+            v_align="MIDDLE",
+            line_height=6.2,
+            headings_style=heading_face,
+            borders_layout=TableBordersLayout.ALL,
+        ) as table:
+            table.row(["Tipo de Provimento", "Qtd. Cargos", "Vagas Previstas", "Vagas Ocupadas", "Saldo de Vagas"])
+
+            for i, p in enumerate(prov_stats):
+                tipo = p.get("tipo", "—")
+                cargos_n = str(p.get("qtd_cargos", 0))
+                prev = p.get("total_previstos", 0)
+                ocup = p.get("total_ocupados", 0)
+                saldo = prev - ocup
+
+                bg = CINZA_50 if i % 2 == 0 else BRANCO
+                data_face = FontFace(fill_color=bg)
+
+                row = table.row()
+                row.cell(tipo, style=FontFace(fill_color=bg, emphasis="B"))
+                row.cell(cargos_n, style=data_face)
+                row.cell(str(prev), style=data_face)
+                row.cell(str(ocup), style=data_face)
+
+                cor_saldo = VERMELHO_ESC if saldo < 0 else (VERDE_ESCURO if saldo > 0 else AMBAR_ESC)
+                bg_saldo = VERMELHO_BG if saldo < 0 else (VERDE_BG if saldo > 0 else AMBAR_BG)
+                row.cell(f"{saldo:+d}", style=FontFace(color=cor_saldo, fill_color=bg_saldo, emphasis="B"))
+
+        self.ln(6)
+
+        # Métricas de Ocupação e Vagas
+        self._section_title("Resumo das Vagas Disponíveis e Taxa de Preenchimento")
+
+        prev_geral = stats.get("total_previstos", 0)
+        ocup_geral = stats.get("total_ocupados", 0)
+        saldo_geral = stats.get("total_saldo", 0)
+        taxa_o = (ocup_geral / prev_geral * 100) if prev_geral > 0 else 0
+        taxa_d = (saldo_geral / prev_geral * 100) if prev_geral > 0 else 0
+
+        self.ln(2)
+        # Barra de progresso visual de preenchimento do quadro
+        self._set_font("B", 8)
+        self.set_text_color(*AZUL_INST)
+        self.cell(w=0, h=4, txt=f"TAXA DE OCUPAÇÃO GERAL: {taxa_o:.1f}% DO QUADRO PREVISTO", ln=1)
+        self.ln(1)
+
+        # Desenha a barra de progresso
+        progress_w = self.CONTENT_W
+        progress_h = 6
+        x_bar = self.MARGIN_X
+        y_bar = self.get_y()
+
+        # Fundo cinza
+        self.set_fill_color(*CINZA_200)
+        self.rect(x_bar, y_bar, progress_w, progress_h, style="F")
+
+        # Preenchimento azul
+        fill_w = (taxa_o / 100.0) * progress_w if taxa_o > 0 else 0
+        if fill_w > progress_w: fill_w = progress_w
+        if fill_w > 0:
+            self.set_fill_color(*AZUL_MEDIO)
+            self.rect(x_bar, y_bar, fill_w, progress_h, style="F")
+
+        self.set_y(y_bar + progress_h + 3)
+
+        # Detalhes adicionais das vagas
+        self._set_font("", 7.5)
+        self.set_text_color(*CINZA_500)
+        self.cell(w=85, h=5, txt=f"Vagas Providas (Em Atividade): {ocup_geral}", ln=0)
+        self.cell(w=85, h=5, txt=f"Vagas Disponíveis (Livres): {saldo_geral} ({taxa_d:.1f}%)", ln=1)
+
+    def _pagina_cargos_detalhe(self, cargos: List[dict]):
+        """Renderiza a listagem detalhada de todos os cargos."""
+        self.add_page()
+        self.set_y(self.t_margin)
+        self.set_auto_page_break(auto=True, margin=25)
+
+        self._set_font("B", 14)
+        self.set_text_color(*CINZA_900)
+        self.cell(w=0, h=8, txt="2. Detalhamento dos Cargos e Saldos", ln=1)
+        self.ln(2)
+
+        heading_face = FontFace(emphasis="B", color=BRANCO, fill_color=AZUL_INST)
+        col_widths = (15, 75, 20, 20, 20, 20)
+
+        self._set_font("", 7.5)
+
+        with self.table(
+            col_widths=col_widths,
+            text_align=("CENTER", "LEFT", "CENTER", "CENTER", "CENTER", "CENTER"),
+            v_align="MIDDLE",
+            line_height=5.2,
+            headings_style=heading_face,
+            borders_layout=TableBordersLayout.ALL,
+        ) as table:
+            table.row(["Cód.", "Nome do Cargo", "Tipo", "Prev.", "Ocup.", "Saldo"])
+
+            for i, c in enumerate(cargos):
+                cod = c.get("codigo_fopag") or "—"
+                nome = c.get("nome", "—")
+                tipo = c.get("tipo_provimento", "—")
+                prev = c.get("total_previstos", 0) or 0
+                ocup = c.get("total_ocupados", 0) or 0
+                saldo = c.get("saldo_vagas", prev - ocup)
+
+                bg = CINZA_50 if i % 2 == 0 else BRANCO
+                data_face = FontFace(fill_color=bg)
+
+                row = table.row()
+                row.cell(str(cod), style=data_face)
+                row.cell(nome, style=data_face)
+                row.cell(tipo, style=data_face)
+                row.cell(str(prev), style=data_face)
+                row.cell(str(ocup), style=data_face)
+
+                cor_saldo = VERMELHO_ESC if saldo < 0 else (VERDE_ESCURO if saldo > 0 else AMBAR_ESC)
+                bg_saldo = VERMELHO_BG if saldo < 0 else (VERDE_BG if saldo > 0 else AMBAR_BG)
+                row.cell(f"{saldo:+d}", style=FontFace(color=cor_saldo, fill_color=bg_saldo, emphasis="B"))
+
+    def montar(self, stats: dict, prov_stats: List[dict], cargos: List[dict]):
+        """Gera o PDF gerencial completo."""
+        self._capa(stats)
+        self._pagina_visao_geral(stats, prov_stats)
+        self._pagina_cargos_detalhe(cargos)
+
+        self.set_title("FOPAG — Relatório Gerencial Consolidado")
+        self.set_author("FOPAG — Prefeitura Municipal de Miracema")
+        self.set_subject("Relatório Consolidado do Quadro de Cargos e Vagas")
+        self.set_creator("FOPAG v1.0")
+
+
+def gerar_relatorio_consolidado(stats: dict, prov_stats: list, cargos: list) -> bytes:
+    """Gera o PDF consolidado e retorna os bytes."""
+    pdf = RelatorioConsolidadoPDF()
+    pdf.montar(stats, prov_stats, cargos)
     return bytes(pdf.output(dest="S"))

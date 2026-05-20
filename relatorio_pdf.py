@@ -595,7 +595,7 @@ class RelatorioCargoPDF(FPDF):
         self.set_y(box_y + box_h + 4)
 
     def _leis_table(self, leis: List[Dict[str, Any]]):
-        """Tabela de leis com design refinado."""
+        """Tabela de leis com design refinado, exibindo a evolução quantitativa (Qtd. Acumulada)."""
         if not leis:
             self.ln(2)
             self._set_font("I", 9)
@@ -604,6 +604,18 @@ class RelatorioCargoPDF(FPDF):
             return
 
         self.ln(1)
+
+        # Ordenação cronológica rigorosa para correta evolução do saldo
+        try:
+            sorted_leis = sorted(
+                leis,
+                key=lambda l: (
+                    int(l.get("ano") or 0),
+                    int(''.join(c for c in str(l.get("numero") or '') if c.isdigit()) or 0)
+                )
+            )
+        except Exception:
+            sorted_leis = leis
 
         def acao_style(acao: str):
             if acao == "Cria":
@@ -623,25 +635,36 @@ class RelatorioCargoPDF(FPDF):
             fill_color=AZUL_INST,
         )
 
-        col_widths = (26, 14, 26, 18, 86)
+        col_widths = (22, 12, 22, 14, 20, 80)
         self._set_font("", 8)
 
         with self.table(
             col_widths=col_widths,
-            text_align=("CENTER", "CENTER", "CENTER", "CENTER", "LEFT"),
+            text_align=("CENTER", "CENTER", "CENTER", "CENTER", "CENTER", "LEFT"),
             v_align="MIDDLE",
             line_height=5.8,
             headings_style=heading_face,
             borders_layout=TableBordersLayout.ALL,
         ) as table:
-            table.row(["Nº Lei", "Ano", "Ação", "Qtd", "Descrição / Ementa"])
+            table.row(["Nº Lei", "Ano", "Ação", "Qtd", "Vagas Acum.", "Descrição / Ementa"])
 
-            for i, lei in enumerate(leis):
+            running_total = 0
+            for i, lei in enumerate(sorted_leis):
                 acao   = lei.get("acao", "Outro")
                 desc   = lei.get("descricao") or "—"
-                qtd    = str(lei.get("quantidade") or "—")
+                qtd_val = lei.get("quantidade")
+                qtd    = str(qtd_val or "—")
                 ano    = str(lei.get("ano") or "—")
                 numero = str(lei.get("numero", "—"))
+
+                if acao == "Cria" and qtd_val is not None:
+                    running_total += qtd_val
+                elif acao == "Extingue" and qtd_val is not None:
+                    running_total = max(0, running_total - qtd_val)
+                elif acao == "Fixa" and qtd_val is not None:
+                    running_total = qtd_val
+
+                acumulado_str = str(running_total)
 
                 bg = CINZA_50 if i % 2 == 0 else BRANCO
                 data_face = FontFace(fill_color=bg)
@@ -651,6 +674,7 @@ class RelatorioCargoPDF(FPDF):
                 row.cell(ano, style=data_face)
                 row.cell(acao, style=acao_style(acao))
                 row.cell(qtd, style=data_face)
+                row.cell(acumulado_str, style=data_face)
                 row.cell(desc, style=data_face)
 
         self.ln(2)

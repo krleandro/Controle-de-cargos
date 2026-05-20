@@ -466,24 +466,158 @@
   .saldo-big .num { font-size: 36px; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; line-height: 1; }
   .saldo-big .lbl { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.8; }
   
-  /* Leis list */
+  /* Leis list e Linha do Tempo Visual Premium */
   .leis-list { display: flex; flex-direction: column; gap: 8px; }
-  .lei-row {
-    padding: 12px 14px; border-radius: var(--radius-md);
-    background: #f8fafc; border: 1px solid var(--border);
-    display: flex; align-items: flex-start; gap: 8px;
-    transition: all 0.2s ease;
+  
+  .timeline {
+    position: relative;
+    padding-left: 26px;
+    margin: 12px 0 24px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
-  .lei-row:hover {
-    border-color: #cbd5e1;
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: var(--border);
+  }
+  .timeline-item {
+    position: relative;
+  }
+  .timeline-badge {
+    position: absolute;
+    left: -26px;
+    top: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
     background: #ffffff;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: bold;
+    z-index: 1;
     box-shadow: var(--shadow-sm);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .lei-row .lei-num { 
+  .timeline-item:hover .timeline-badge {
+    transform: scale(1.25);
+  }
+  .timeline-badge.Cria {
+    border-color: #22c55e;
+    background: #dcfce7;
+    color: #15803d;
+  }
+  .timeline-badge.Extingue {
+    border-color: #ef4444;
+    background: var(--danger-bg);
+    color: var(--danger-text);
+  }
+  .timeline-badge.Fixa {
+    border-color: #eab308;
+    background: #fef9c3;
+    color: #a16207;
+  }
+  .timeline-badge.Altera {
+    border-color: #3b82f6;
+    background: var(--bg-selected);
+    color: var(--blue-primary);
+  }
+  .timeline-badge.Regulamenta {
+    border-color: #64748b;
+    background: #f1f5f9;
+    color: #475569;
+  }
+  .timeline-badge.Outro {
+    border-color: #94a3b8;
+    background: #f8fafc;
+    color: #64748b;
+  }
+  
+  .timeline-card {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: var(--shadow-xs);
+  }
+  .timeline-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: var(--shadow-sm);
+    background: #f8fafc;
+  }
+  .timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .timeline-law {
     font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 12.5px; font-weight: 700; color: var(--blue-primary); white-space: nowrap; 
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--blue-primary);
   }
-  .lei-row .lei-txt { font-size: 12px; color: var(--text-secondary); line-height: 1.45; }
+  .timeline-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .timeline-running-total {
+    font-size: 9.5px;
+    font-weight: 700;
+    background: var(--bg-xlightblue);
+    color: var(--blue-primary);
+    border: 1px solid var(--blue-light);
+    padding: 1px 6px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .timeline-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    word-break: break-word;
+    margin-top: 2px;
+  }
+  .timeline-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 4px;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 6px;
+  }
+  .timeline-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    transition: background 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .timeline-btn:hover {
+    background: var(--bg-hover);
+  }
   
   .lei-acao {
     display: inline-flex; align-items: center;
@@ -1062,7 +1196,7 @@
         Leis Pertinentes
         <button class="btn-outline" style="font-size:11px;padding:3px 10px" onclick="abrirModalLei()">+ Registrar Lei</button>
       </div>
-      <div class="leis-list" id="d-leis">
+      <div class="timeline" id="d-leis">
         <div style="font-size:12px;color:var(--text-muted)">Carregando…</div>
       </div>
     </div>
@@ -1555,21 +1689,74 @@ async function abrirDrawer(cargoId, force = false) {
     // Leis
     const leisEl = $('d-leis');
     if (d.leis.length === 0) {
-      leisEl.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:8px 0">Nenhuma lei vinculada.</div>`;
+      leisEl.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:8px 2px">Nenhuma lei cadastrada.</div>`;
     } else {
-      leisEl.innerHTML = d.leis.map(l => `
-        <div class="lei-row" style="justify-content: space-between; align-items: center">
-          <div style="flex:1">
-            <div class="lei-num">Lei ${l.numero}/${l.ano}</div>
-            ${l.quantidade ? `<div style="font-size:11px;color:var(--text-secondary)">${l.acao} ${l.quantidade} vaga${l.quantidade!==1?'s':''}</div>` : ''}
+      // Ordenação rigorosamente cronológica por ano e número da lei
+      const sortedLeis = [...d.leis].sort((a, b) => {
+        if (a.ano !== b.ano) return a.ano - b.ano;
+        const numA = parseInt(a.numero.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.numero.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+
+      let runningTotal = 0;
+      leisEl.innerHTML = sortedLeis.map(l => {
+        let badgeIcon = '📄';
+        let impactText = '';
+        const qtdVal = l.quantidade;
+        
+        if (l.acao === 'Cria') {
+          runningTotal += (qtdVal || 0);
+          badgeIcon = '＋';
+          impactText = `Criação de <strong style="color:var(--success-text)">+${qtdVal}</strong> vaga${qtdVal !== 1 ? 's' : ''}`;
+        } else if (l.acao === 'Extingue') {
+          runningTotal = Math.max(0, runningTotal - (qtdVal || 0));
+          badgeIcon = '－';
+          impactText = `Extinção de <strong style="color:var(--danger-text)">-${qtdVal}</strong> vaga${qtdVal !== 1 ? 's' : ''}`;
+        } else if (l.acao === 'Fixa') {
+          runningTotal = (qtdVal || 0);
+          badgeIcon = '📌';
+          impactText = `Quadro fixado em <strong>${qtdVal}</strong> vaga${qtdVal !== 1 ? 's' : ''}`;
+        } else if (l.acao === 'Altera') {
+          badgeIcon = '✏️';
+          impactText = `Alteração Qualitativa`;
+        } else if (l.acao === 'Regulamenta') {
+          badgeIcon = '⚖️';
+          impactText = `Regulamentação`;
+        } else {
+          badgeIcon = '⚙️';
+          impactText = `Outro Impacto`;
+        }
+
+        const formatTotal = `${runningTotal} vaga${runningTotal !== 1 ? 's' : ''}`;
+
+        return `
+          <div class="timeline-item">
+            <div class="timeline-badge ${l.acao}" title="Ação: ${l.acao}">${badgeIcon}</div>
+            <div class="timeline-card">
+              <div class="timeline-header">
+                <span class="timeline-law">Lei nº ${l.numero}/${l.ano}</span>
+                <div class="timeline-meta">
+                  <span class="timeline-running-total" title="Vagas previstas acumuladas após esta lei">
+                    📊 ${formatTotal}
+                  </span>
+                </div>
+              </div>
+              
+              <div style="font-size:11px; font-weight:600; color:var(--text-primary); margin-top:2px;">
+                ${impactText}
+              </div>
+              
+              ${l.descricao ? `<div class="timeline-desc">${l.descricao}</div>` : ''}
+              
+              <div class="timeline-actions">
+                <button class="timeline-btn" onclick="abrirModalLeiEdicao(${l.id})" title="Editar Lei">✏️ Editar</button>
+                <button class="timeline-btn" style="color:var(--danger-text)" onclick="deletarLei(${l.id})" title="Excluir Lei">🗑️ Excluir</button>
+              </div>
+            </div>
           </div>
-          <div style="display:flex; gap:4px; align-items:center;">
-            <span class="lei-acao ${l.acao}">${l.acao}</span>
-            <button class="action-btn" style="font-size:12px" onclick="abrirModalLeiEdicao(${l.id})" title="Editar Lei">✏️</button>
-            <button class="action-btn" style="color:var(--danger-text); font-size:12px" onclick="deletarLei(${l.id})" title="Excluir Lei">🗑️</button>
-          </div>
-        </div>`
-      ).join('');
+        `;
+      }).join('');
     }
 
     $('drawer').classList.add('open');

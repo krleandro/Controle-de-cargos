@@ -869,7 +869,7 @@
               <th onclick="sortBy('situacao')">Situação <span class="sort-arrow hidden" id="arrow-situacao"></span></th>
               <th onclick="sortBy('situacao_delib')">Delib 359 <span class="sort-arrow hidden" id="arrow-situacao_delib"></span></th>
               <th onclick="sortBy('tipo_provimento')">Provimento <span class="sort-arrow hidden" id="arrow-tipo_provimento"></span></th>
-              <th onclick="sortBy('carga_horaria')" title="Carga horária">CH <span class="sort-arrow hidden" id="arrow-carga_horaria"></span></th>
+              <th onclick="sortBy('carga_horaria')" class="td-center" title="Carga horária">CH <span class="sort-arrow hidden" id="arrow-carga_horaria"></span></th>
               <th onclick="sortBy('total_previstos')" class="td-center">Previstos <span class="sort-arrow hidden" id="arrow-total_previstos"></span></th>
               <th onclick="sortBy('total_ocupados')"  class="td-center">Ocupados <span class="sort-arrow hidden" id="arrow-total_ocupados"></span></th>
               <th onclick="sortBy('saldo_vagas')"     class="td-center">Saldo <span class="sort-arrow hidden" id="arrow-saldo_vagas"></span></th>
@@ -1163,6 +1163,15 @@ function badgeDelib(s) {
   return `<span class="badge ${cls}">${s}</span>`;
 }
 
+function formatarCH(ch) {
+  if (!ch) return '—';
+  ch = String(ch).trim();
+  if (/^\d+$/.test(ch)) {
+    return ch + 'h';
+  }
+  return ch;
+}
+
 // ── Carregar stats ─────────────────────────────────────────────────────────
 async function carregarStats() {
   try {
@@ -1256,7 +1265,7 @@ function renderTabela() {
         <td>${badgeSituacao(c.situacao)}</td>
         <td>${badgeDelib(c.situacao_delib || 'não enviado')}</td>
         <td style="color:var(--text-secondary);font-size:12px">${c.tipo_provimento}</td>
-        <td class="td-center" style="color:var(--text-secondary);font-size:12px">${c.carga_horaria ? c.carga_horaria+'h' : '—'}</td>
+        <td class="td-center" style="color:var(--text-secondary);font-size:12px">${formatarCH(c.carga_horaria)}</td>
         <td class="td-num">${c.total_previstos}</td>
         <td class="td-center" style="color:var(--text-secondary)">${c.total_ocupados}</td>
         <td class="td-center"><span class="saldo-badge ${saldoClass(saldo)}">${saldoLabel(saldo)}</span></td>
@@ -1316,7 +1325,7 @@ function renderCartoes() {
         </div>
         <div class="card-foot">
           <span class="card-code">${c.codigo_fopag || '—'}</span>
-          <span class="card-ch">${c.carga_horaria ? c.carga_horaria + 'h' : ''}</span>
+          <span class="card-ch">${formatarCH(c.carga_horaria) === '—' ? '' : formatarCH(c.carga_horaria)}</span>
         </div>
       </div>`;
   }).join('');
@@ -1394,7 +1403,7 @@ async function abrirDrawer(cargoId, force = false) {
     $('d-situacao').innerHTML  = badgeSituacao(c.situacao);
     $('d-situacao_delib').innerHTML = badgeDelib(c.situacao_delib || 'não enviado');
     $('d-tipo').textContent    = c.tipo_provimento;
-    $('d-ch').textContent      = c.carga_horaria ? c.carga_horaria + 'h' : '—';
+    $('d-ch').textContent      = formatarCH(c.carga_horaria);
     $('d-simb').textContent    = c.simbolo_vencimento || '—';
     $('d-esc').textContent     = c.escolaridade || '—';
     $('d-prev').textContent    = c.total_previstos;

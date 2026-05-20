@@ -37,6 +37,14 @@ AMBAR_BG       = (254, 243, 199)
 DOURADO        = (180, 145, 40)
 
 
+def formatar_ch(ch, default_val="—"):
+    if not ch:
+        return default_val
+    ch_str = str(ch).strip()
+    if ch_str.isdigit():
+        return f"{ch_str}h"
+    return ch_str
+
 
 class RelatorioCargoPDF(FPDF):
     """PDF A4 para relatório individual de cargo — layout institucional."""
@@ -303,7 +311,7 @@ class RelatorioCargoPDF(FPDF):
         items = [
             ("Código FOPAG",    cargo.get("codigo_fopag") or "—"),
             ("Tipo",            tipo),
-            ("Carga Horária",   f"{cargo.get('carga_horaria')}h" if cargo.get("carga_horaria") else "—"),
+            ("Carga Horária",   formatar_ch(cargo.get("carga_horaria"))),
             ("Escolaridade",    cargo.get("escolaridade") or "—"),
             ("Símbolo Venc.",   cargo.get("simbolo_vencimento") or "—"),
         ]
@@ -596,7 +604,7 @@ class RelatorioCargoPDF(FPDF):
         self._info_panel_start()
         self._info_row("Escolaridade / Requisito",  cargo.get("escolaridade"),            alt=True)
         self._info_row("Carga Horária Semanal",
-                       f"{cargo.get('carga_horaria')}h" if cargo.get("carga_horaria") else None,
+                       formatar_ch(cargo.get("carga_horaria"), default_val=None),
                        alt=False)
         self._info_row("Símbolo de Vencimento", cargo.get("simbolo_vencimento"),      alt=True)
 

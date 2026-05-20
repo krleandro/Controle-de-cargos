@@ -138,9 +138,9 @@ class RelatorioCargoPDF(FPDF):
 
     def _capa(self, cargo: Dict[str, Any]):
         """Renderiza a página de capa institucional."""
-        # Desativa auto page break temporariamente para a capa
-        self.set_auto_page_break(auto=False, margin=0)
         self.add_page()
+        # Desativa auto page break temporariamente para a capa após adicioná-la
+        self.set_auto_page_break(auto=False, margin=0)
         PAGE_H = 297
 
         # ── Faixa azul escura no topo ──────────────────────────────────────
@@ -363,8 +363,7 @@ class RelatorioCargoPDF(FPDF):
         self.cell(w=0, h=5, txt=f"Documento gerado em {agora} · Confidencial · Uso interno",
                   align="C", ln=0)
 
-        # Reativa auto page break para o resto do documento
-        self.set_auto_page_break(auto=True, margin=25)
+        # O auto page break será reativado no início de _pagina_conteudo
 
     # ═══════════════════════════════════════════════════════════════════════════
     # COMPONENTES DE CONTEÚDO
@@ -663,6 +662,8 @@ class RelatorioCargoPDF(FPDF):
     def _pagina_conteudo(self, cargo: Dict[str, Any], leis: List[Dict[str, Any]], fontes: List[Dict[str, Any]]):
         """Monta as páginas de conteúdo após a capa."""
         self.add_page()
+        # Reativa auto page break para o resto do documento após iniciar a página de conteúdo
+        self.set_auto_page_break(auto=True, margin=25)
 
         nome = cargo.get("nome", "Cargo não identificado")
         sit  = cargo.get("situacao", "Em vigor")

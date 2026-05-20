@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS Cargos (
     -- Requisitos de ingresso
     escolaridade            TEXT,                    -- ex: "Superior", "Ensino Médio"
     requisito_especifico    TEXT,                    -- ex: referência à Lei Federal nº 11.350/2006
+    restricao_exigencia     TEXT,
+    fonte_carga_horaria     TEXT,
+    fonte_atribuicoes       TEXT,
 
     -- Regime de trabalho
     carga_horaria           TEXT    CHECK (
@@ -165,7 +168,11 @@ SELECT
     END AS alerta_saldo_negativo,
     c.atribuicoes,
     c.criado_em,
-    c.atualizado_em
+    c.atualizado_em,
+    c.recrutamento,
+    c.restricao_exigencia,
+    c.fonte_carga_horaria,
+    c.fonte_atribuicoes
 FROM Cargos c;
 
 

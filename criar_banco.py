@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS Cargos (
     total_previstos     INTEGER NOT NULL DEFAULT 0 CHECK (total_previstos >= 0),
     total_ocupados      INTEGER NOT NULL DEFAULT 0 CHECK (total_ocupados >= 0),
     atribuicoes         TEXT,
+    recrutamento        TEXT,
+    restricao_exigencia TEXT,
+    fonte_carga_horaria TEXT,
+    fonte_atribuicoes   TEXT,
     criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
@@ -74,7 +78,8 @@ SELECT
     total_previstos, total_ocupados,
     (total_previstos - total_ocupados) AS saldo_vagas,
     CASE WHEN (total_previstos - total_ocupados) < 0 THEN 1 ELSE 0 END AS alerta_saldo_negativo,
-    atribuicoes, criado_em, atualizado_em
+    atribuicoes, criado_em, atualizado_em,
+    recrutamento, restricao_exigencia, fonte_carga_horaria, fonte_atribuicoes
 FROM Cargos;
 
 CREATE TRIGGER IF NOT EXISTS trg_cargos_atualizado_em

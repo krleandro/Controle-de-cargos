@@ -454,6 +454,7 @@
     padding-bottom: 6px;
   }
   .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .info-item.full-width { grid-column: span 2; }
   .info-item label { font-size: 10.5px; color: var(--text-muted); display: block; margin-bottom: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
   .info-item span  { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
   .saldo-big {
@@ -947,6 +948,10 @@
         <div class="info-item"><label>Carga Horária</label><span id="d-ch">—</span></div>
         <div class="info-item"><label>Símbolo de Vencimento</label><span id="d-simb">—</span></div>
         <div class="info-item"><label>Escolaridade</label><span id="d-esc">—</span></div>
+        <div class="info-item"><label>Recrutamento</label><span id="d-recrutamento">—</span></div>
+        <div class="info-item full-width"><label>Restrição/Exigência</label><span id="d-restricao">—</span></div>
+        <div class="info-item full-width"><label>Fonte da CH</label><span id="d-fonte-ch">—</span></div>
+        <div class="info-item full-width"><label>Fonte das atribuições</label><span id="d-fonte-atr">—</span></div>
       </div>
     </div>
 
@@ -1075,6 +1080,32 @@
       <div class="form-group" style="grid-column:1/-1">
         <label>Escolaridade / Requisito</label>
         <input class="form-control" id="nc-esc" placeholder="ex: Superior completo">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Recrutamento</label>
+        <input class="form-control" id="nc-recrutamento" list="recrutamento-options" placeholder="ex: Amplo, Limitado...">
+        <datalist id="recrutamento-options">
+          <option value="Amplo"></option>
+          <option value="Limitado"></option>
+        </datalist>
+      </div>
+      <div class="form-group">
+        <label>Fonte da Carga Horária</label>
+        <input class="form-control" id="nc-fonte-ch" placeholder="ex: Lei Orgânica, etc.">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Restrição / Exigência</label>
+        <input class="form-control" id="nc-restricao" placeholder="ex: Registro no conselho de classe, etc.">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Fonte das Atribuições</label>
+        <input class="form-control" id="nc-fonte-atr" placeholder="ex: Decreto 123/2010, etc.">
       </div>
     </div>
     <div class="form-row">
@@ -1408,6 +1439,10 @@ async function abrirDrawer(cargoId, force = false) {
     $('d-esc').textContent     = c.escolaridade || '—';
     $('d-prev').textContent    = c.total_previstos;
     $('d-ocup').textContent    = c.total_ocupados;
+    $('d-recrutamento').textContent = c.recrutamento || '—';
+    $('d-restricao').textContent    = c.restricao_exigencia || '—';
+    $('d-fonte-ch').textContent     = c.fonte_carga_horaria || '—';
+    $('d-fonte-atr').textContent    = c.fonte_atribuicoes || '—';
 
     const saldo = c.saldo_vagas;
     $('d-saldo-num').textContent = saldoLabel(saldo);
@@ -1565,7 +1600,7 @@ async function submitLei() {
 function abrirModalNovoCargo() {
   state.isEditMode = false;
   $('mc-title').textContent = 'Novo Cargo';
-  ['nc-nome','nc-fopag','nc-simb','nc-esc','nc-atr'].forEach(id => $(id).value = '');
+  ['nc-nome','nc-fopag','nc-simb','nc-esc','nc-atr','nc-recrutamento','nc-restricao','nc-fonte-ch','nc-fonte-atr'].forEach(id => $(id).value = '');
   $('nc-situacao').value = 'Em vigor';
   $('nc-situacao-delib').value = 'não enviado';
   $('nc-tipo').value = 'Efetivo';
@@ -1590,6 +1625,10 @@ function abrirModalCargoEdicao() {
   $('nc-prev').value = state.cargoAtivo.total_previstos || 0;
   $('nc-ocup').value = state.cargoAtivo.total_ocupados || 0;
   $('nc-atr').value = state.cargoAtivo.atribuicoes || '';
+  $('nc-recrutamento').value = state.cargoAtivo.recrutamento || '';
+  $('nc-restricao').value    = state.cargoAtivo.restricao_exigencia || '';
+  $('nc-fonte-ch').value     = state.cargoAtivo.fonte_carga_horaria || '';
+  $('nc-fonte-atr').value    = state.cargoAtivo.fonte_atribuicoes || '';
   
   $('overlay-cargo').classList.add('show');
 }
@@ -1611,6 +1650,10 @@ async function submitCargo() {
     total_previstos: parseInt($('nc-prev').value) || 0,
     total_ocupados:  parseInt($('nc-ocup').value) || 0,
     atribuicoes: $('nc-atr').value.trim() || null,
+    recrutamento: $('nc-recrutamento').value.trim() || null,
+    restricao_exigencia: $('nc-restricao').value.trim() || null,
+    fonte_carga_horaria: $('nc-fonte-ch').value.trim() || null,
+    fonte_atribuicoes: $('nc-fonte-atr').value.trim() || null,
   };
   try {
     let url = '/api/cargos';

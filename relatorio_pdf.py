@@ -145,25 +145,31 @@ class RelatorioCargoPDF(FPDF):
         self.set_fill_color(*AZUL_INST)
         self.rect(x=0, y=0, w=self.PAGE_W, h=52, style="F")
 
+        # Detalhe geométrico abstrato premium no banner do topo
+        self.set_fill_color(30, 80, 150) # Azul médio
+        self.polygon([(140, 0), (210, 0), (210, 52), (170, 52)], style="F")
+        self.set_fill_color(40, 95, 175) # Azul mais claro de acento
+        self.polygon([(175, 0), (210, 0), (210, 52), (195, 52)], style="F")
+
         # Linha dourada abaixo da faixa
         self.set_fill_color(*DOURADO)
         self.rect(x=0, y=52, w=self.PAGE_W, h=1.2, style="F")
 
-        # Nome do sistema
-        self.set_xy(0, 14)
-        self._set_font("B", 26)
+        # Nome do sistema (alinhamento editorial à esquerda)
+        self.set_xy(self.MARGIN_X, 12)
+        self._set_font("B", 28)
         self.set_text_color(*BRANCO)
-        self.cell(w=self.PAGE_W, h=12, txt="FOPAG", align="C", ln=1)
+        self.cell(w=100, h=12, txt="FOPAG", align="L", ln=1)
 
-        self.set_x(0)
-        self._set_font("", 9)
-        self.set_text_color(180, 210, 255)
-        self.cell(w=self.PAGE_W, h=6, txt="Sistema de Gestão de Cargos e Vagas", align="C", ln=1)
+        self.set_x(self.MARGIN_X)
+        self._set_font("", 9.5)
+        self.set_text_color(190, 215, 255)
+        self.cell(w=100, h=6, txt="Sistema de Gestão de Cargos e Vagas", align="L", ln=1)
 
-        self.set_x(0)
+        self.set_x(self.MARGIN_X)
         self._set_font("I", 7.5)
-        self.set_text_color(140, 175, 220)
-        self.cell(w=self.PAGE_W, h=5, txt="Prefeitura Municipal de Miracema", align="C", ln=1)
+        self.set_text_color(150, 185, 230)
+        self.cell(w=100, h=5, txt="Prefeitura Municipal de Miracema", align="L", ln=1)
 
         # ── Área central de conteúdo ───────────────────────────────────────
         self.set_xy(0, 70)
@@ -304,47 +310,49 @@ class RelatorioCargoPDF(FPDF):
                 self.set_text_color(*cor_saldo)
                 self.cell(w=col_w - 8, h=4, txt=label_saldo, ln=1, align="C")
 
-        # ── Dados-chave na capa ───────────────────────────────────────────
+        # ── Dados-chave na capa (Grid 3x2 Simétrico e Preciso) ────────────
         info_y = panel_y + panel_h + 12
         self._divider_line(info_y - 2)
 
         items = [
-            ("Código FOPAG",    cargo.get("codigo_fopag") or "—"),
-            ("Tipo",            tipo),
-            ("Carga Horária",   formatar_ch(cargo.get("carga_horaria"))),
-            ("Escolaridade",    cargo.get("escolaridade") or "—"),
-            ("Símbolo Venc.",   cargo.get("simbolo_vencimento") or "—"),
+            ("Código FOPAG:",    cargo.get("codigo_fopag") or "—"),
+            ("Tipo:",            tipo),
+            ("Carga Horária:",   formatar_ch(cargo.get("carga_horaria"))),
+            ("Recrutamento:",    cargo.get("recrutamento") or "—"),
+            ("Símbolo Venc.:",   cargo.get("simbolo_vencimento") or "—"),
+            ("Deliberação 359:", (cargo.get("situacao_delib") or "Não Enviado").title()),
         ]
 
-        col2_x = self.PAGE_W / 2 + 5
         col1_x = self.MARGIN_X
+        col2_x = self.PAGE_W / 2 + 5
+        grid_col_w = self.CONTENT_W / 2
 
         self.set_y(info_y)
         for i, (lbl, val) in enumerate(items):
-            row_y = info_y + i * 7.5
-            col_x = col1_x if i % 2 == 0 else col2_x
-            if i % 2 == 0 and i > 0:
-                row_y = info_y + (i // 2) * 7.5
-                col_x = col1_x
-            elif i % 2 != 0:
-                row_y = info_y + (i // 2) * 7.5
-                col_x = col2_x
+            col_idx = i % 2
+            row_idx = i // 2
+            col_x = col1_x if col_idx == 0 else col2_x
+            row_y = info_y + row_idx * 7.5
 
             self.set_xy(col_x, row_y)
             self._set_font("", 7.5)
             self.set_text_color(*CINZA_500)
-            self.cell(w=42, h=5, txt=lbl, ln=0)
+            self.cell(w=32, h=5, txt=lbl, ln=0)
 
             self._set_font("B", 8.5)
             self.set_text_color(*CINZA_900)
-            avail = (self.PAGE_W / 2 - self.MARGIN_X - 42) if col_x == col1_x else (self.PAGE_W - col2_x - self.MARGIN_X - 42)
-            self.cell(w=avail + 42, h=5, txt=str(val), ln=0)
+            avail = grid_col_w - 36
+            self.cell(w=avail, h=5, txt=str(val), ln=0)
 
         # ── Rodapé da capa ────────────────────────────────────────────────
         self.set_fill_color(*AZUL_INST)
         self.rect(x=0, y=PAGE_H - 18, w=self.PAGE_W, h=18, style="F")
         self.set_fill_color(*DOURADO)
         self.rect(x=0, y=PAGE_H - 18, w=self.PAGE_W, h=0.8, style="F")
+
+        # Detalhe geométrico no rodapé correspondente ao topo
+        self.set_fill_color(30, 80, 150)
+        self.polygon([(160, PAGE_H - 18), (210, PAGE_H - 18), (210, PAGE_H), (175, PAGE_H)], style="F")
 
         self.set_xy(self.MARGIN_X, PAGE_H - 13)
         self._set_font("", 7.5)
@@ -365,7 +373,11 @@ class RelatorioCargoPDF(FPDF):
         self.line(self.MARGIN_X, y, self.PAGE_W - self.MARGIN_X, y)
 
     def _section_title(self, title: str):
-        """Título de seção com fundo azul suave e barra à esquerda."""
+        """Título de seção com fundo azul suave e barra à esquerda com prevenção de quebra órfã."""
+        # Se restarem menos de 45mm na página (descontando o rodapé), força nova página
+        if self.get_y() > (self.h - 45):
+            self.add_page()
+
         self.ln(3)
         y = self.get_y()
         h = 8.5
@@ -398,6 +410,91 @@ class RelatorioCargoPDF(FPDF):
             self.set_draw_color(*CINZA_200)
             self.set_line_width(0.2)
             self.rect(self.MARGIN_X, self._panel_start_y, self.CONTENT_W, h, style="D")
+        self.ln(2)
+
+    def _render_grid_panel(self, items: List[tuple]):
+        """Renderiza um painel em grid de 2 colunas para metadados curtos."""
+        col_w = self.CONTENT_W / 2
+        row_h = 7.5
+        
+        y_start = self.get_y()
+        num_rows = (len(items) + 1) // 2
+        panel_h = num_rows * row_h + 3
+        
+        self.set_fill_color(*CINZA_50)
+        self.set_draw_color(*CINZA_200)
+        self.set_line_width(0.2)
+        self.rect(self.MARGIN_X, y_start, self.CONTENT_W, panel_h, style="FD")
+        
+        # Faixa azul sutil no topo
+        self.set_fill_color(*AZUL_MEDIO)
+        self.rect(self.MARGIN_X, y_start, self.CONTENT_W, 1.2, style="F")
+        
+        self.ln(2.5)
+        
+        for i, (lbl, val) in enumerate(items):
+            col_idx = i % 2
+            row_idx = i // 2
+            
+            x_pos = self.MARGIN_X + col_idx * col_w + 4
+            y_pos = y_start + 2.5 + row_idx * row_h
+            
+            # Linha vertical separadora
+            if col_idx > 0:
+                self.set_draw_color(*CINZA_200)
+                self.set_line_width(0.15)
+                self.line(self.MARGIN_X + col_w, y_start + 3, self.MARGIN_X + col_w, y_start + panel_h - 3)
+            
+            self.set_xy(x_pos, y_pos)
+            self._set_font("", 7.5)
+            self.set_text_color(*CINZA_500)
+            self.cell(w=38, h=row_h - 1, txt=f"{lbl}:", ln=0)
+            
+            self._set_font("B", 8)
+            self.set_text_color(*CINZA_900)
+            
+            # Evita crashes e garante formatação limpa
+            val_str = str(val).strip() if val is not None else "—"
+            if val_str == "" or val_str == "None":
+                val_str = "—"
+            self.cell(w=col_w - 46, h=row_h - 1, txt=val_str, ln=0)
+            
+        self.set_y(y_start + panel_h + 4)
+
+    def _render_text_block(self, label: str, text: str):
+        """Renderiza um bloco moderno de texto longo com borda dourada lateral decorativa nativa e padding."""
+        val_str = str(text).strip() if text is not None else ""
+        if not val_str or val_str == "None" or val_str == "—":
+            return
+            
+        self.ln(2.5)
+        
+        # Salva o c_margin original
+        old_margin = self.c_margin
+        # Configura padding esquerdo de 4.0mm para afastar o texto da borda dourada
+        self.c_margin = 4.0
+        
+        # Configura cor da borda para DOURADO e largura da linha
+        self.set_draw_color(*DOURADO)
+        self.set_line_width(1.0)
+        
+        # Título do bloco com borda esquerda nativa
+        self._set_font("B", 7.5)
+        self.set_text_color(*AZUL_INST)
+        self.set_x(self.MARGIN_X)
+        self.cell(w=self.CONTENT_W, h=4, txt=label.upper(), border="L", ln=1)
+        
+        self.ln(1)
+        self._set_font("", 8)
+        self.set_text_color(*CINZA_700)
+        
+        # Texto com borda esquerda nativa
+        self.set_x(self.MARGIN_X)
+        self.multi_cell(w=self.CONTENT_W, h=4.5, txt=val_str, border="L", ln=1)
+        
+        # Restaura c_margin e largura de linha padrão
+        self.c_margin = old_margin
+        self.set_line_width(0.2)
         self.ln(2)
 
     def _info_row(self, label: str, value: str, alt: bool = False, width_label: float = 58):
@@ -438,7 +535,10 @@ class RelatorioCargoPDF(FPDF):
         return w_text + 4
 
     def _saldo_box(self, previstos: int, ocupados: int, saldo: int):
-        """Box de quantitativos — três KPI cards horizontais."""
+        """Box de quantitativos — três KPI cards horizontais com prevenção de quebra órfã."""
+        if self.get_y() > (self.h - 45):
+            self.add_page()
+
         if saldo < 0:
             cor_s, label_s = VERMELHO_ESC, "Déficit"
         elif saldo == 0:
@@ -568,9 +668,9 @@ class RelatorioCargoPDF(FPDF):
         self.set_text_color(*CINZA_900)
         self.cell(w=0, h=8, txt="Relatório de Cargo", ln=1)
 
-        self._set_font("B", 12)
+        self._set_font("B", 11)
         self.set_text_color(*AZUL_MEDIO)
-        self.multi_cell(w=0, h=6.5, txt=nome, ln=1)
+        self.multi_cell(w=0, h=6, txt=nome, ln=1)
         self.ln(0.5)
 
         # Badges
@@ -588,48 +688,39 @@ class RelatorioCargoPDF(FPDF):
         bg_t, txt_t = tipo_cores.get(tipo, tipo_cores["Efetivo"])
         self._badge_inline(sit, bg_s, txt_s)
         self._badge_inline(tipo, bg_t, txt_t)
-        self.ln(9)
+        self.ln(8)
 
-        # ── Seção 1: Identificação ──
-        self._section_title("Identificação do Cargo")
-        self._info_panel_start()
-        self._info_row("Código FOPAG",        cargo.get("codigo_fopag"),             alt=True)
-        self._info_row("Situação",             sit,                                   alt=False)
-        self._info_row("Situação Delib. 359",  (cargo.get("situacao_delib") or "não enviado").title(), alt=True)
-        self._info_row("Tipo de Provimento",   tipo,                                  alt=False)
-        self._info_panel_end()
+        # ── Seção 1: Identificação e Regime ──
+        self._section_title("Identificação e Regime")
+        ident_items = [
+            ("Código FOPAG", cargo.get("codigo_fopag")),
+            ("Tipo de Provimento", tipo),
+            ("Situação", sit),
+            ("Situação Delib. 359", (cargo.get("situacao_delib") or "não enviado").title()),
+            ("Recrutamento", cargo.get("recrutamento")),
+            ("Símbolo Vencimento", cargo.get("simbolo_vencimento")),
+            ("Carga Horária Semanal", formatar_ch(cargo.get("carga_horaria"))),
+            ("Fonte da Carga Horária", cargo.get("fonte_carga_horaria")),
+        ]
+        self._render_grid_panel(ident_items)
 
-        # ── Seção 2: Detalhamento ──
-        self._section_title("Detalhamento")
-        self._info_panel_start()
-        self._info_row("Escolaridade / Requisito",  cargo.get("escolaridade"),            alt=True)
-        self._info_row("Carga Horária Semanal",
-                       formatar_ch(cargo.get("carga_horaria"), default_val=None),
-                       alt=False)
-        self._info_row("Símbolo de Vencimento", cargo.get("simbolo_vencimento"),      alt=True)
+        # ── Seção 2: Requisitos e Atribuições ──
+        self._section_title("Requisitos e Atribuições")
+        self._render_text_block("Requisitos de Escolaridade", cargo.get("escolaridade"))
+        self._render_text_block("Restrições e Exigências de Ingresso", cargo.get("restricao_exigencia"))
+        self._render_text_block("Fonte das Atribuições", cargo.get("fonte_atribuicoes"))
+        self._render_text_block("Atribuições Descritivas do Cargo", cargo.get("atribuicoes"))
 
-        atr = cargo.get("atribuicoes")
-        if atr:
-            row_y = self.get_y()
-            self.set_x(self.MARGIN_X + 4)
-            self._set_font("", 7.5)
-            self.set_text_color(*CINZA_500)
-            self.cell(w=58, h=5.5, txt="Atribuições do Cargo", ln=0)
-            self._set_font("", 8.5)
-            self.set_text_color(*CINZA_700)
-            self.multi_cell(w=0, h=5.5, txt=str(atr), ln=1)
-        self._info_panel_end()
-
-        # ── Seção 3: Quantitativos ──
+        # ── Seção 3: Quantitativos do Quadro ──
         self._section_title("Quantitativos do Quadro")
         prev  = cargo.get("total_previstos", 0) or 0
         ocup  = cargo.get("total_ocupados",  0) or 0
         saldo = cargo.get("saldo_vagas", prev - ocup)
         self._saldo_box(prev, ocup, saldo)
 
-        # ── Seção 4: Fontes de Carga Horária ──
+        # ── Seção 4: Fontes Adicionais de Carga Horária ──
         if fontes:
-            self._section_title("Fontes de Carga Horária")
+            self._section_title("Fontes Adicionais de Carga Horária")
             self._info_panel_start()
             for idx, f in enumerate(fontes):
                 det = f.get("detalhes") or f"{f.get('tipo', '—')} {f.get('numero', '')}"

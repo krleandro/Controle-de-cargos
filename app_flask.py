@@ -121,13 +121,16 @@ def criar_cargo():
         cur = con.execute("""
             INSERT INTO Cargos
               (nome, codigo_fopag, situacao, situacao_delib, tipo_provimento, escolaridade,
-               carga_horaria, simbolo_vencimento, total_previstos, total_ocupados, atribuicoes)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+               carga_horaria, simbolo_vencimento, total_previstos, total_ocupados, atribuicoes,
+               recrutamento, restricao_exigencia, fonte_carga_horaria, fonte_atribuicoes)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             dados.get("nome"), dados.get("codigo_fopag"), dados.get("situacao", "Em vigor"),
             dados.get("situacao_delib", "não enviado"), dados.get("tipo_provimento", "Efetivo"),
             dados.get("escolaridade"), dados.get("carga_horaria"), dados.get("simbolo_vencimento"),
-            dados.get("total_previstos", 0), dados.get("total_ocupados", 0), dados.get("atribuicoes")
+            dados.get("total_previstos", 0), dados.get("total_ocupados", 0), dados.get("atribuicoes"),
+            dados.get("recrutamento"), dados.get("restricao_exigencia"),
+            dados.get("fonte_carga_horaria"), dados.get("fonte_atribuicoes")
         ))
         con.commit()
         return jsonify({"id": cur.lastrowid, "mensagem": "Cargo criado com sucesso."}), 201
@@ -147,13 +150,16 @@ def atualizar_cargo(cargo_id):
             UPDATE Cargos SET
               nome=?, codigo_fopag=?, situacao=?, situacao_delib=?, tipo_provimento=?, escolaridade=?,
               carga_horaria=?, simbolo_vencimento=?, total_previstos=?,
-              total_ocupados=?, atribuicoes=?
+              total_ocupados=?, atribuicoes=?, recrutamento=?, restricao_exigencia=?,
+              fonte_carga_horaria=?, fonte_atribuicoes=?
             WHERE id=?
         """, (
             dados.get("nome"), dados.get("codigo_fopag"), dados.get("situacao"),
             dados.get("situacao_delib"), dados.get("tipo_provimento"),
             dados.get("escolaridade"), dados.get("carga_horaria"), dados.get("simbolo_vencimento"),
-            dados.get("total_previstos"), dados.get("total_ocupados"), dados.get("atribuicoes"), cargo_id
+            dados.get("total_previstos"), dados.get("total_ocupados"), dados.get("atribuicoes"),
+            dados.get("recrutamento"), dados.get("restricao_exigencia"),
+            dados.get("fonte_carga_horaria"), dados.get("fonte_atribuicoes"), cargo_id
         ))
         con.commit()
         return jsonify({"mensagem": "Cargo atualizado."})

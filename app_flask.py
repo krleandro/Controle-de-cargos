@@ -484,6 +484,23 @@ def relatorios_consolidado():
     )
 
 
+@app.route("/api/leis/historico", methods=["GET"])
+def leis_historico():
+    con = get_db_connection()
+    try:
+        res = con.execute("""
+            SELECT lp.*, c.nome AS cargo_nome, c.codigo_fopag AS cargo_codigo_fopag
+            FROM LeisPertinentes lp
+            JOIN Cargos c ON lp.cargo_id = c.id
+            ORDER BY lp.ano DESC, CAST(lp.numero AS INTEGER) DESC, lp.criado_em DESC
+        """).fetchall()
+        return jsonify([dict(r) for r in res])
+    except Exception as e:
+        abort(500, description=f"Erro ao buscar histórico de leis: {e}")
+    finally:
+        con.close()
+
+
 @app.route("/")
 def index():
     with open(HTML_DIR / "index.html", "r", encoding="utf-8") as f:

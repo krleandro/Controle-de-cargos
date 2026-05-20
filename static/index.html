@@ -1146,6 +1146,44 @@
       </div>
     </div>
 
+    <!-- Histórico de Leis (Linha do Tempo Global) -->
+    <div id="leis-historico-wrap" style="display: none; margin: 24px 32px 0; animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);">
+      <!-- Barra de controle e pesquisa -->
+      <div style="display: flex; gap: 16px; margin-bottom: 24px; align-items: center; flex-wrap: wrap; background: var(--bg-card); padding: 16px 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);">
+        
+        <div style="flex: 1; min-width: 250px; position: relative;">
+          <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">Pesquisar</label>
+          <input type="text" id="lh-search" oninput="filtrarHistoricoLeis()" placeholder="Buscar por número da lei, descrição ou cargo..." style="width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 13px; font-family: inherit; transition: border-color 0.15s; outline: none; background: #ffffff;" onfocus="this.style.borderColor='var(--blue-primary)'" onblur="this.style.borderColor='var(--border)'">
+        </div>
+        
+        <div style="width: 200px; min-width: 150px;">
+          <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">Ação Disparada</label>
+          <select id="lh-filtro-acao" onchange="filtrarHistoricoLeis()" style="width: 100%; padding: 9.5px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 13px; font-family: inherit; background: #ffffff; cursor: pointer; outline: none;">
+            <option value="Todos">Todos os Impactos</option>
+            <option value="Cria">＋ Criação de Vagas</option>
+            <option value="Extingue">－ Extinção de Vagas</option>
+            <option value="Fixa">📌 Fixação de Quadro</option>
+            <option value="Altera">✏️ Alteração Qualitativa</option>
+            <option value="Regulamenta">⚖️ Regulamentação</option>
+            <option value="Outro">⚙️ Outro Impacto</option>
+          </select>
+        </div>
+        
+        <div style="align-self: flex-end;">
+          <button id="lh-sort-btn" onclick="toggleOrdenacaoHistoricoLeis()" class="btn-outline" style="height: 38px; display: flex; align-items: center; gap: 8px; font-weight: 600; padding: 0 16px; border-radius: var(--radius-md); font-size: 13px; background: #ffffff; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;">
+            <span id="lh-sort-icon">⏳</span> <span id="lh-sort-label">Cronológica (Passado ➔ Presente)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Container da linha do tempo global -->
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px 32px; box-shadow: var(--shadow-sm);">
+        <div id="lh-timeline-container" class="timeline" style="margin-left: 6px;">
+          <div style="font-size: 13px; color: var(--text-muted); text-align: center; padding: 40px 0;">Carregando histórico legislativo...</div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1397,6 +1435,8 @@ const state = {
   cargoAtivo:    null,
   isEditMode:    false,
   viewMode:      'table',   // 'table' | 'cards' | 'compact'
+  leisHistorico: [],
+  lhSortOrder:   'asc',
 };
 
 // ── Utilitários ────────────────────────────────────────────────────────────
@@ -1878,7 +1918,12 @@ async function submitLei() {
     if (!r.ok) throw new Error(d.detail || 'Erro ao registrar lei');
     fecharModalLei();
     toast(d.mensagem, 'ok');
-    await abrirDrawer(cargoLeiId, true);   // force=true: atualiza sem fechar
+    if ($('drawer').classList.contains('open') && state.cargoAtivo && state.cargoAtivo.id === cargoLeiId) {
+      await abrirDrawer(cargoLeiId, true);
+    }
+    if ($('leis-historico-wrap').style.display === 'block') {
+      await carregarHistoricoLeisGlobal();
+    }
     await carregarStats();
     carregarCargos();
   } catch(e) { toast(e.message,'err'); }
@@ -2057,6 +2102,10 @@ function setView(v, btn) {
   btn.querySelector('.nav-dot') || btn.insertAdjacentHTML('beforeend','<span class="nav-dot"></span>');
   document.querySelectorAll('.nav-item:not(.active) .nav-dot').forEach(d => d.remove());
   
+  // Oculta todos os painéis customizados por padrão
+  $('relatorios-wrap').style.display = 'none';
+  $('leis-historico-wrap').style.display = 'none';
+  
   if (v === 'relatorios') {
     $('stats-bar').style.display = 'none';
     $('toolbar').style.display = 'none';
@@ -2068,13 +2117,23 @@ function setView(v, btn) {
     document.querySelector('#header p').textContent = 'Indicadores de conformidade, estatísticas do quadro e controle legislativo';
     $('relatorios-wrap').style.display = 'block';
     carregarRelatoriosDashboard();
+  } else if (v === 'leis') {
+    $('stats-bar').style.display = 'none';
+    $('toolbar').style.display = 'none';
+    $('table-wrap').style.display = 'none';
+    $('cards-wrap').classList.remove('visible');
+    $('compact-wrap').classList.remove('visible');
+    document.querySelector('#header .header-actions').style.display = 'none';
+    document.querySelector('#header h1').textContent = 'Histórico de Leis';
+    document.querySelector('#header p').textContent = 'Linha do tempo interativa e controle da movimentação legislativa';
+    $('leis-historico-wrap').style.display = 'block';
+    carregarHistoricoLeisGlobal();
   } else {
     $('stats-bar').style.display = 'grid';
     $('toolbar').style.display = 'flex';
     document.querySelector('#header .header-actions').style.display = 'flex';
     document.querySelector('#header h1').textContent = 'Quadro de Pessoal';
     document.querySelector('#header p').textContent = 'Cargos efetivos e comissionados · Prefeitura de Miracema';
-    $('relatorios-wrap').style.display = 'none';
     setViewMode(state.viewMode);
     
     if (v === 'alertas') {
@@ -2089,8 +2148,6 @@ function setView(v, btn) {
       $('search').value = '';
       atualizarBotoesFiltro();
       carregarCargos();
-    } else if (v === 'leis') {
-      toast('Selecione um cargo na tabela para visualizar ou registrar suas leis.', 'ok');
     }
   }
 }
@@ -2213,6 +2270,218 @@ async function baixarRelatorioConsolidado() {
     window.URL.revokeObjectURL(url);
     toast('Relatório consolidado gerado com sucesso!', 'ok');
   } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+// ── Histórico de Leis Global ────────────────────────────────────────────────
+async function carregarHistoricoLeisGlobal() {
+  try {
+    const res = await fetch('/api/leis/historico');
+    if (!res.ok) throw new Error('Erro ao buscar histórico de leis');
+    const laws = await res.json();
+    
+    // 1. Agrupar leis por cargo para calcular o saldo acumulado
+    const lawsByCargo = {};
+    for (const l of laws) {
+      if (!lawsByCargo[l.cargo_id]) {
+        lawsByCargo[l.cargo_id] = [];
+      }
+      lawsByCargo[l.cargo_id].push(l);
+    }
+    
+    // 2. Ordenar e calcular saldo acumulado para cada cargo
+    for (const cargoId in lawsByCargo) {
+      // Ordena cronologicamente direto para o cálculo da "história"
+      lawsByCargo[cargoId].sort((a, b) => {
+        if (a.ano !== b.ano) return a.ano - b.ano;
+        const numA = parseInt(a.numero.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.numero.replace(/\D/g, '')) || 0;
+        if (numA !== numB) return numA - numB;
+        return a.id - b.id;
+      });
+      
+      let runningTotal = 0;
+      for (const l of lawsByCargo[cargoId]) {
+        if (l.acao === 'Cria') {
+          runningTotal += (l.quantidade || 0);
+        } else if (l.acao === 'Extingue') {
+          runningTotal = Math.max(0, runningTotal - (l.quantidade || 0));
+        } else if (l.acao === 'Fixa') {
+          runningTotal = (l.quantidade || 0);
+        }
+        l.vagas_acumuladas = runningTotal;
+      }
+    }
+    
+    // 3. Salvar no estado global
+    state.leisHistorico = laws;
+    
+    // 4. Filtrar e Renderizar
+    filtrarHistoricoLeis();
+    
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+function filtrarHistoricoLeis() {
+  const query = $('lh-search').value.toLowerCase().trim();
+  const filtroAcao = $('lh-filtro-acao').value;
+  
+  // Filtrar leis com base na busca e na ação
+  let filtered = state.leisHistorico.filter(l => {
+    // Filtro por tipo de ação
+    if (filtroAcao !== 'Todos' && l.acao !== filtroAcao) return false;
+    
+    // Filtro por busca textual (número da lei, ementa ou nome do cargo)
+    if (query) {
+      const matchNumero = l.numero.toString().toLowerCase().includes(query);
+      const matchDesc = l.descricao ? l.descricao.toLowerCase().includes(query) : false;
+      const matchCargo = l.cargo_nome.toLowerCase().includes(query);
+      return matchNumero || matchDesc || matchCargo;
+    }
+    
+    return true;
+  });
+  
+  // Ordenar de acordo com lhSortOrder
+  filtered.sort((a, b) => {
+    const factor = state.lhSortOrder === 'asc' ? 1 : -1;
+    if (a.ano !== b.ano) return factor * (a.ano - b.ano);
+    const numA = parseInt(a.numero.replace(/\D/g, '')) || 0;
+    const numB = parseInt(b.numero.replace(/\D/g, '')) || 0;
+    if (numA !== numB) return factor * (numA - numB);
+    return factor * (a.id - b.id);
+  });
+  
+  // Renderizar cartões
+  const container = $('lh-timeline-container');
+  if (filtered.length === 0) {
+    container.innerHTML = `<div style="font-size: 13px; color: var(--text-muted); text-align: center; padding: 40px 0;">Nenhuma alteração legislativa encontrada com os filtros aplicados.</div>`;
+    return;
+  }
+  
+  container.innerHTML = filtered.map(l => {
+    let badgeIcon = '📄';
+    let impactText = '';
+    const qtdVal = l.quantidade;
+    
+    if (l.acao === 'Cria') {
+      badgeIcon = '＋';
+      impactText = `Criação de <strong style="color:var(--success-text)">+${qtdVal}</strong> vaga${qtdVal !== 1 ? 's' : ''}`;
+    } else if (l.acao === 'Extingue') {
+      badgeIcon = '－';
+      impactText = `Extinção de <strong style="color:var(--danger-text)">-${qtdVal}</strong> vaga${qtdVal !== 1 ? 's' : ''}`;
+    } else if (l.acao === 'Fixa') {
+      badgeIcon = '📌';
+      impactText = `Quadro fixado em <strong>${qtdVal}</strong> vaga${qtdVal !== 1 ? 's' : ''}`;
+    } else if (l.acao === 'Altera') {
+      badgeIcon = '✏️';
+      impactText = `Alteração Qualitativa`;
+    } else if (l.acao === 'Regulamenta') {
+      badgeIcon = '⚖️';
+      impactText = `Regulamentação`;
+    } else {
+      badgeIcon = '⚙️';
+      impactText = `Outro Impacto`;
+    }
+    
+    const formatTotal = `${l.vagas_acumuladas} vaga${l.vagas_acumuladas !== 1 ? 's' : ''}`;
+    
+    return `
+      <div class="timeline-item">
+        <div class="timeline-badge ${l.acao}" title="Ação: ${l.acao}">${badgeIcon}</div>
+        <div class="timeline-card">
+          <div class="timeline-header">
+            <span class="timeline-law">Lei nº ${l.numero}/${l.ano}</span>
+            <div class="timeline-meta">
+              <span class="timeline-running-total" title="Vagas previstas acumuladas para este cargo após esta lei">
+                📊 ${formatTotal}
+              </span>
+            </div>
+          </div>
+          
+          <!-- Banner Premium do Cargo -->
+          <div style="margin: 6px 0 8px 0; padding: 6px 10px; background: var(--bg-xlightblue); border-left: 3px solid var(--blue-primary); border-radius: 4px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+            <span style="font-size: 11.5px; font-weight: 700; color: var(--blue-primary); display: flex; align-items: center; gap: 4px;">
+              💼 Cargo: <span style="text-transform: uppercase;">${l.cargo_nome}</span> ${l.cargo_codigo_fopag ? `(Cód: ${l.cargo_codigo_fopag})` : ''}
+            </span>
+            <button class="btn-outline" style="font-size: 10px; padding: 2px 8px; border-radius: 4px; background: #ffffff; color: var(--blue-primary); border: 1px solid var(--blue-light); font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 2px;" onclick="fecharDrawer(); abrirDrawer(${l.cargo_id}, true)">
+              🔍 Ver Cargo
+            </button>
+          </div>
+          
+          <div style="font-size:11px; font-weight:600; color:var(--text-primary); margin-top:2px;">
+            ${impactText}
+          </div>
+          
+          ${l.descricao ? `<div class="timeline-desc">${l.descricao}</div>` : ''}
+          
+          <div class="timeline-actions">
+            <button class="timeline-btn" onclick="prepararEditarLeiGlobal(${l.id}, ${l.cargo_id})" title="Editar Lei">✏️ Editar</button>
+            <button class="timeline-btn" style="color:var(--danger-text)" onclick="deletarLeiGlobal(${l.id}, ${l.cargo_id})" title="Excluir Lei">🗑️ Excluir</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleOrdenacaoHistoricoLeis() {
+  state.lhSortOrder = state.lhSortOrder === 'asc' ? 'desc' : 'asc';
+  
+  // Atualizar botão de UI
+  const label = $('lh-sort-label');
+  const icon = $('lh-sort-icon');
+  
+  if (state.lhSortOrder === 'asc') {
+    label.textContent = 'Cronológica (Passado ➔ Presente)';
+    icon.textContent = '⏳';
+  } else {
+    label.textContent = 'Mais Recentes Primeiro (Presente ➔ Passado)';
+    icon.textContent = '⌛';
+  }
+  
+  filtrarHistoricoLeis();
+}
+
+async function prepararEditarLeiGlobal(leiId, cargoId) {
+  try {
+    const r = await fetch(`/api/cargos/${cargoId}`);
+    if (!r.ok) throw new Error('Erro ao carregar detalhes do cargo');
+    const d = await r.json();
+    const c = d.cargo;
+    c.leis = d.leis;
+    state.cargoAtivo = c;
+    
+    // Abre o modal de edição padrão
+    abrirModalLeiEdicao(leiId);
+  } catch(e) {
+    toast('Erro ao preparar edição: ' + e.message, 'err');
+  }
+}
+
+async function deletarLeiGlobal(leiId, cargoId) {
+  if (!confirm("Tem certeza que deseja excluir esta lei? O impacto nas vagas será desfeito.")) return;
+  try {
+    const r = await fetch(`/api/cargos/${cargoId}/leis/${leiId}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Erro ao excluir lei');
+    toast(d.mensagem, 'ok');
+    
+    // Atualiza a linha do tempo global
+    await carregarHistoricoLeisGlobal();
+    
+    // Atualiza estatísticas e cargos no background
+    await carregarStats();
+    carregarCargos();
+    
+    // Se o drawer estiver aberto para o respectivo cargo, atualiza ele também
+    if ($('drawer').classList.contains('open') && state.cargoAtivo && state.cargoAtivo.id === cargoId) {
+      await abrirDrawer(cargoId, true);
+    }
+  } catch(e) {
     toast(e.message, 'err');
   }
 }

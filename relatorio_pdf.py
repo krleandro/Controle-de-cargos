@@ -138,6 +138,8 @@ class RelatorioCargoPDF(FPDF):
 
     def _capa(self, cargo: Dict[str, Any]):
         """Renderiza a página de capa institucional."""
+        # Desativa auto page break temporariamente para a capa
+        self.set_auto_page_break(auto=False, margin=0)
         self.add_page()
         PAGE_H = 297
 
@@ -360,6 +362,9 @@ class RelatorioCargoPDF(FPDF):
         agora = datetime.now().strftime("%d/%m/%Y %H:%M")
         self.cell(w=0, h=5, txt=f"Documento gerado em {agora} · Confidencial · Uso interno",
                   align="C", ln=0)
+
+        # Reativa auto page break para o resto do documento
+        self.set_auto_page_break(auto=True, margin=25)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # COMPONENTES DE CONTEÚDO

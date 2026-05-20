@@ -229,7 +229,7 @@
 
   /* ── Header ───────────────────────────────────────────────────────── */
   #header {
-    padding: 24px 32px;
+    padding: 24px 24px;
     background: #ffffff;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -323,14 +323,14 @@
   }
 
   /* ── Conteúdo rolável ─────────────────────────────────────────────── */
-  #content { flex: 1; overflow-y: auto; padding: 0 0 40px; }
+  #content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 0 40px; min-width: 0; }
 
   /* ── Stats bar (Premium Cards) ────────────────────────────────────── */
   #stats-bar {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 20px;
-    padding: 24px 32px 0;
+    padding: 24px 24px 0;
   }
   .stat-card {
     background: #ffffff; border: 1px solid var(--border);
@@ -368,7 +368,7 @@
 
   /* ── Toolbar (iOS/SaaS style segmented controls) ──────────────────── */
   #toolbar {
-    padding: 24px 32px 0;
+    padding: 24px 24px 0;
     display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
   }
   .filter-group {
@@ -398,7 +398,7 @@
 
   /* ── Tabela (Sleek and rounded style) ─────────────────────────────── */
   #table-wrap {
-    margin: 20px 32px 0;
+    margin: 20px 24px 0;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
@@ -409,7 +409,7 @@
   table { width: 100%; border-collapse: collapse; }
   thead tr { background: var(--slate-50); }
   th {
-    padding: 16px 18px; text-align: left;
+    padding: 12px 14px; text-align: left;
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 11px; font-weight: 700; text-transform: uppercase;
     letter-spacing: .08em; color: var(--text-secondary);
@@ -423,7 +423,7 @@
   th .sort-arrow { margin-left: 6px; color: var(--blue-primary); font-weight: 800; }
   
   td {
-    padding: 14px 18px; font-size: 13.5px;
+    padding: 11px 14px; font-size: 13px;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
     color: var(--text-primary);

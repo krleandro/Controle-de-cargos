@@ -1169,7 +1169,7 @@
     <div id="relatorios-wrap" style="display: none; margin: 24px 32px 0; animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);">
       <!-- Botão de exportação principal no topo -->
       <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-        <button class="btn-primary" onclick="baixarRelatorioConsolidado()" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: none; font-weight: 600; padding: 12px 24px; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md);">
+        <button class="btn-primary" onclick="abrirModalFiltroRelatorio()" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: none; font-weight: 600; padding: 12px 24px; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md);">
           <span>📄</span> Exportar Relatório Executivo Completo (PDF)
         </button>
       </div>
@@ -1405,6 +1405,54 @@
     <div class="modal-footer">
       <button class="btn-ghost" onclick="fecharModalLei()">Cancelar</button>
       <button class="btn-primary" onclick="submitLei()">Registrar Lei</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: FILTRAR RELATÓRIO ─────────────────────────────────────────── -->
+<div class="overlay" id="overlay-filtro-relatorio" onclick="if(event.target===this)fecharModalFiltroRelatorio()">
+  <div class="modal" style="width: 440px;">
+    <div class="modal-header">
+      <div>
+        <h2>Opções do Relatório</h2>
+        <p style="color:var(--text-secondary); font-size:12px; margin-top:4px;">Selecione os filtros para a exportação em PDF</p>
+      </div>
+      <button class="close-btn" onclick="fecharModalFiltroRelatorio()">×</button>
+    </div>
+    
+    <div class="form-group" style="margin-bottom: 18px;">
+      <label style="font-weight:600; color:var(--text-primary); font-size:12px; display:block; margin-bottom:6px;">Situação Deliberação 359</label>
+      <select class="form-control" id="fr-delib" style="width:100%; height:40px; padding:8px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary);">
+        <option value="todos" selected>Todos</option>
+        <option value="não enviado">Não enviado</option>
+        <option value="salvo">Salvo</option>
+        <option value="enviado">Enviado</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 18px;">
+      <label style="font-weight:600; color:var(--text-primary); font-size:12px; display:block; margin-bottom:6px;">Situação do Cargo</label>
+      <select class="form-control" id="fr-situacao" style="width:100%; height:40px; padding:8px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary);">
+        <option value="todos" selected>Todos</option>
+        <option value="em vigor">Em vigor</option>
+        <option value="extinto">Extinto</option>
+        <option value="revogado">Revogado</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 24px;">
+      <label style="font-weight:600; color:var(--text-primary); font-size:12px; display:block; margin-bottom:6px;">Tipo de Provimento</label>
+      <select class="form-control" id="fr-tipo" style="width:100%; height:40px; padding:8px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary);">
+        <option value="todos" selected>Todos</option>
+        <option value="efetivo">Efetivo</option>
+        <option value="eletivo">Eletivo</option>
+        <option value="comissão">Comissão</option>
+      </select>
+    </div>
+
+    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:18px;">
+      <button class="btn-ghost" onclick="fecharModalFiltroRelatorio()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:1px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarBaixarRelatorioConsolidado()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:none; background:linear-gradient(135deg, var(--blue-primary), #3b82f6); color:#fff; cursor:pointer; box-shadow:var(--shadow-md);">Gerar PDF</button>
     </div>
   </div>
 </div>
@@ -2368,10 +2416,34 @@ async function carregarRelatoriosDashboard() {
   }
 }
 
-async function baixarRelatorioConsolidado() {
+function abrirModalFiltroRelatorio() {
+  document.getElementById('fr-delib').value = 'todos';
+  document.getElementById('fr-situacao').value = 'todos';
+  document.getElementById('fr-tipo').value = 'todos';
+  document.getElementById('overlay-filtro-relatorio').classList.add('show');
+}
+
+function fecharModalFiltroRelatorio() {
+  document.getElementById('overlay-filtro-relatorio').classList.remove('show');
+}
+
+async function confirmarBaixarRelatorioConsolidado() {
+  const delib = document.getElementById('fr-delib').value;
+  const situacao = document.getElementById('fr-situacao').value;
+  const tipo = document.getElementById('fr-tipo').value;
+
+  fecharModalFiltroRelatorio();
+
   try {
     toast('Gerando PDF consolidado, por favor aguarde...', 'ok');
-    const r = await fetch('/api/relatorios/consolidado');
+    
+    const params = new URLSearchParams();
+    if (delib) params.append('situacao_delib', delib);
+    if (situacao) params.append('situacao', situacao);
+    if (tipo) params.append('tipo_provimento', tipo);
+    
+    const urlQuery = '/api/relatorios/consolidado?' + params.toString();
+    const r = await fetch(urlQuery);
     if (!r.ok) throw new Error('Erro ao baixar relatório consolidado');
     const blob = await r.blob();
     const url = window.URL.createObjectURL(blob);

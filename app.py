@@ -433,37 +433,84 @@ def relatorios_estatisticas():
 
 @app.route("/api/relatorios/consolidado", methods=["GET"])
 def relatorios_consolidado():
+    situacao_delib = request.args.get("situacao_delib")
+    situacao = request.args.get("situacao")
+    tipo_provimento = request.args.get("tipo_provimento")
+    
+    where_clauses = []
+    params = []
+    
+    if situacao_delib and situacao_delib.lower() != "todos":
+        val = situacao_delib
+        if val.lower() == "salvo":
+            val = "salvo - em revisão"
+        elif val.lower() in ("não enviado", "nao enviado"):
+            val = "não enviado"
+        elif val.lower() == "enviado":
+            val = "Enviado"
+        where_clauses.append("situacao_delib = ?")
+        params.append(val)
+        
+    if situacao and situacao.lower() != "todos":
+        val = situacao
+        if val.lower() == "em vigor":
+            val = "Em vigor"
+        elif val.lower() == "extinto":
+            val = "Extinto"
+        elif val.lower() == "revogado":
+            val = "Revogado"
+        where_clauses.append("situacao = ?")
+        params.append(val)
+        
+    if tipo_provimento and tipo_provimento.lower() != "todos":
+        val = tipo_provimento
+        if val.lower() == "efetivo":
+            val = "Efetivo"
+        elif val.lower() in ("comissão", "comissao"):
+            val = "Comissão"
+        elif val.lower() == "eletivo":
+            val = "Eletivo"
+        where_clauses.append("tipo_provimento = ?")
+        params.append(val)
+        
+    where_str = ""
+    if where_clauses:
+        where_str = " WHERE " + " AND ".join(where_clauses)
+
     con = get_db_connection()
     try:
         # KPIs gerais
-        res_stats = con.execute("""
+        query_stats = f"""
             SELECT
               COUNT(*)                                           AS total_cargos,
               COALESCE(SUM(total_previstos), 0)                 AS total_previstos,
               COALESCE(SUM(total_ocupados), 0)                  AS total_ocupados,
               COALESCE(SUM(saldo_vagas), 0)                     AS total_saldo,
-              SUM(CASE WHEN saldo_vagas < 0 THEN 1 ELSE 0 END)  AS alertas
+              COALESCE(SUM(CASE WHEN saldo_vagas < 0 THEN 1 ELSE 0 END), 0)  AS alertas
             FROM vw_SaldoVagas
-        """).fetchone()
-        
+            {where_str}
+        """
+        res_stats = con.execute(query_stats, params).fetchone()
         stats = dict(res_stats)
         
         # Estatísticas de provimento
-        res_prov = con.execute("""
+        query_prov = f"""
             SELECT
               tipo_provimento                                    AS tipo,
               COUNT(*)                                           AS qtd_cargos,
               COALESCE(SUM(total_previstos), 0)                 AS total_previstos,
               COALESCE(SUM(total_ocupados), 0)                  AS total_ocupados
             FROM vw_SaldoVagas
+            {where_str}
             GROUP BY tipo_provimento
             ORDER BY tipo_provimento
-        """).fetchall()
-        
+        """
+        res_prov = con.execute(query_prov, params).fetchall()
         prov_stats = [dict(r) for r in res_prov]
         
         # Todos os cargos ordenados alfabeticamente para a listagem
-        res_cargos = con.execute("SELECT * FROM vw_SaldoVagas ORDER BY nome COLLATE NOCASE").fetchall()
+        query_cargos = f"SELECT * FROM vw_SaldoVagas {where_str} ORDER BY nome COLLATE NOCASE"
+        res_cargos = con.execute(query_cargos, params).fetchall()
         cargos = [dict(r) for r in res_cargos]
     finally:
         con.close()

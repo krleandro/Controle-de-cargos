@@ -265,36 +265,42 @@ def atualizar_lei(cargo_id, lei_id):
 
     con = get_db_connection()
     try:
-        # Pega a lei antiga para reverter o impacto no cargo
+        # Pega a lei antiga para comparar e reverter o impacto no cargo
         lei_antiga = con.execute("SELECT acao, quantidade FROM LeisPertinentes WHERE id=? AND cargo_id=?", (lei_id, cargo_id)).fetchone()
         if not lei_antiga:
             abort(404, description="Lei não encontrada")
 
-        cargo = con.execute("SELECT id, total_previstos, total_ocupados FROM Cargos WHERE id=?", (cargo_id,)).fetchone()
-        
-        # Desfaz o impacto da lei antiga
-        prev_atual = cargo["total_previstos"]
         acao_antiga = lei_antiga["acao"]
-        qtd_antiga = lei_antiga["quantidade"] or 0
-        
-        if acao_antiga == "Cria":
-            prev_atual = max(0, prev_atual - qtd_antiga)
-        elif acao_antiga == "Extingue":
-            prev_atual = prev_atual + qtd_antiga
-        # Se era "Fixa", não temos como saber o valor anterior, então ignoramos o desfazimento.
+        qtd_antiga = lei_antiga["quantidade"]
 
-        # Aplica o impacto da nova lei
-        if acao == "Cria":
-            novo_prev = prev_atual + quantidade
-        elif acao == "Extingue":
-            novo_prev = max(0, prev_atual - quantidade)
-        elif acao == "Fixa":
-            novo_prev = quantidade
-        else:
-            novo_prev = prev_atual
+        # Só altera as vagas se houve mudança real de acao ou de quantidade
+        alterou_quantitativo = (acao != acao_antiga) or (quantidade != qtd_antiga)
 
-        if novo_prev != cargo["total_previstos"]:
-            con.execute("UPDATE Cargos SET total_previstos=? WHERE id=?", (novo_prev, cargo_id))
+        if alterou_quantitativo:
+            cargo = con.execute("SELECT id, total_previstos, total_ocupados FROM Cargos WHERE id=?", (cargo_id,)).fetchone()
+            
+            # Desfaz o impacto da lei antiga
+            prev_atual = cargo["total_previstos"]
+            qtd_antiga_val = qtd_antiga or 0
+            
+            if acao_antiga == "Cria":
+                prev_atual = max(0, prev_atual - qtd_antiga_val)
+            elif acao_antiga == "Extingue":
+                prev_atual = prev_atual + qtd_antiga_val
+            # Se era "Fixa", não temos como saber o valor anterior, então ignoramos o desfazimento.
+
+            # Aplica o impacto da nova lei
+            if acao == "Cria":
+                novo_prev = prev_atual + quantidade
+            elif acao == "Extingue":
+                novo_prev = max(0, prev_atual - quantidade)
+            elif acao == "Fixa":
+                novo_prev = quantidade
+            else:
+                novo_prev = prev_atual
+
+            if novo_prev != cargo["total_previstos"]:
+                con.execute("UPDATE Cargos SET total_previstos=? WHERE id=?", (novo_prev, cargo_id))
 
         con.execute("""
             UPDATE LeisPertinentes SET

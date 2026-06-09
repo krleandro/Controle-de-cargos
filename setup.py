@@ -147,7 +147,7 @@ FROM Cargos;
         if pd.isna(v): return None
         s = str(v).strip()
         m = re.search(r'\b(\d+)\b', s)
-        if m and m.group(1) in {'10','20','25','30','40','44'}: return m.group(1)
+        if m and m.group(1) in {'10','20','24','25','30','40','44'}: return m.group(1)
         return s if s else None
 
     def _lei_parse(txt):

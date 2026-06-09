@@ -137,7 +137,7 @@ def sanitizar_carga(v):
     if pd.isna(v): return None
     s = str(v).strip()
     m = re.search(r'\b(\d+)\b', s)
-    if m and m.group(1) in {'10','20','25','30','40','44'}: return m.group(1)
+    if m and m.group(1) in {'10','20','24','25','30','40','44'}: return m.group(1)
     if s in ('Não regulamentada em lei', 'Verificar edital'): return s
     return None
 

@@ -178,7 +178,7 @@ def sanitizar_carga_horaria(valor) -> Optional[str]:
     if pd.isna(valor):
         return None
     s = str(valor).strip()
-    validos = {'10', '20', '25', '30', '40', '44'}
+    validos = {'10', '20', '24', '25', '30', '40', '44'}
     # Tenta extrair número inteiro
     m = re.search(r'\b(\d+)\b', s)
     if m and m.group(1) in validos:

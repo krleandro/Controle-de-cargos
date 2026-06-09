@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS Cargos (
 
     -- Regime de trabalho
     carga_horaria           TEXT    CHECK (
-                                carga_horaria IN ('10','20','25','30','40','44',
+                                carga_horaria IN ('10','20','24','25','30','40','44',
                                                   'Não regulamentada em lei','Verificar edital', NULL)
                             ),
 
@@ -245,6 +245,7 @@ INSERT OR IGNORE INTO Dominios (categoria, valor) VALUES
     ('recrutamento',    'Limitado'),
     ('carga_horaria',   '10'),
     ('carga_horaria',   '20'),
+    ('carga_horaria',   '24'),
     ('carga_horaria',   '25'),
     ('carga_horaria',   '30'),
     ('carga_horaria',   '40'),

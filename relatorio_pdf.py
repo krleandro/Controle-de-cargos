@@ -1599,6 +1599,13 @@ class RelatorioComissionadosSecretariaPDF(FPDF):
                 self._set_font("", 8)
                 self.set_text_color(*CINZA_600)
                 self.cell(w=0, h=4, txt=f"Vagas Previstas: {prev}  |  Vagas Ocupadas: {ocup}  |  Saldo: {saldo:+d}", ln=1)
+                
+                restricao = c.get("restricao_exigencia")
+                if restricao:
+                    self._set_font("I", 7.5)
+                    self.set_text_color(*CINZA_500)
+                    self.multi_cell(w=self.CONTENT_W, h=4, txt=f"Exigência/Restrição: {restricao}", ln=1)
+                
                 self.ln(1)
                 
                 # Exibir ocupantes do cargo

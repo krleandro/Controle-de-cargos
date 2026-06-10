@@ -779,7 +779,8 @@ def listar_ocupantes():
     secretaria = request.args.get("secretaria")
     
     sql = """
-        SELECT o.*, c.nome AS cargo_nome, c.codigo_fopag AS cargo_codigo_fopag, c.simbolo_vencimento AS cargo_simbolo_vencimento, c.secretaria AS cargo_secretaria
+        SELECT o.*, c.nome AS cargo_nome, c.codigo_fopag AS cargo_codigo_fopag, c.simbolo_vencimento AS cargo_simbolo_vencimento, c.secretaria AS cargo_secretaria,
+               c.recrutamento AS cargo_recrutamento, c.restricao_exigencia AS cargo_restricao_exigencia
         FROM Ocupantes o
         JOIN Cargos c ON o.cargo_id = c.id
         WHERE 1=1

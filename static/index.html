@@ -1213,30 +1213,74 @@
             <h3 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0;">Relação de Ocupantes de Cargos Comissionados</h3>
             <span id="c-ocupantes-count" style="font-size: 11px; font-weight: 700; background: var(--bg-xlightblue); color: var(--blue-primary); padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid var(--blue-light);">0 ocupantes</span>
           </div>
-          <div class="search-wrap" style="margin-left: auto;">
-            <span class="search-icon">🔍</span>
-            <input id="ocupante-search" type="text" placeholder="Buscar ocupante, matrícula ou cargo…" oninput="carregarOcupantes()" style="width: 280px; padding: 8px 12px 8px 34px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--slate-50); outline: none; font-size: 12.5px;">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div class="search-wrap">
+              <span class="search-icon">🔍</span>
+              <input id="ocupante-search" type="text" placeholder="Buscar ocupante, matrícula ou cargo…" oninput="carregarOcupantes()" style="width: 280px; padding: 8px 12px 8px 34px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--slate-50); outline: none; font-size: 12.5px;">
+            </div>
+            <div class="view-toggle" title="Modo de visualização" style="display: flex;">
+              <button class="view-btn active" id="c-vbtn-table" onclick="setComissionadosViewMode('table')" title="Tabela">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="13" height="3" rx="1" fill="currentColor" opacity=".35"/><rect x="1" y="6" width="13" height="3" rx="1" fill="currentColor" opacity=".6"/><rect x="1" y="11" width="13" height="3" rx="1" fill="currentColor"/></svg>
+              </button>
+              <button class="view-btn" id="c-vbtn-cards" onclick="setComissionadosViewMode('cards')" title="Cartões">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg>
+              </button>
+              <button class="view-btn" id="c-vbtn-compact" onclick="setComissionadosViewMode('compact')" title="Compacto">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1.5" width="13" height="1.5" rx=".75" fill="currentColor" opacity=".3"/><rect x="1" y="4.75" width="13" height="1.5" rx=".75" fill="currentColor" opacity=".5"/><rect x="1" y="8" width="13" height="1.5" rx=".75" fill="currentColor" opacity=".7"/><rect x="1" y="11.25" width="13" height="1.5" rx=".75" fill="currentColor"/></svg>
+              </button>
+            </div>
           </div>
         </div>
-        <div class="table-scroll">
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="background: var(--slate-50); border-bottom: 1px solid var(--border);">
-                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Matrícula</th>
-                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Nome do Ocupante</th>
-                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Cargo Comissionado</th>
-                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center;">Símbolo</th>
-                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center;">Recrutamento</th>
-                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Portaria / B.O.</th>
-                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center;">Data Nomeação</th>
-                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: right;" class="no-sort">Ações</th>
-              </tr>
-            </thead>
-            <tbody id="c-ocupantes-tbody">
-              <tr><td colspan="8" class="empty-state">Nenhum ocupante cadastrado.</td></tr>
-            </tbody>
-          </table>
+
+        <div id="c-view-container">
+          <!-- Modo Tabela -->
+          <div id="c-table-wrap" class="table-scroll">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background: var(--slate-50); border-bottom: 1px solid var(--border);">
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Matrícula</th>
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Nome do Ocupante</th>
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Cargo Comissionado</th>
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center;">Símbolo</th>
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center;">Recrutamento</th>
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Portaria / B.O.</th>
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center;">Data Nomeação</th>
+                  <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: right;" class="no-sort">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="c-ocupantes-tbody">
+                <tr><td colspan="8" class="empty-state">Nenhum ocupante cadastrado.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Modo Cartões -->
+          <div id="c-cards-wrap" style="display: none; padding: 24px 24px 32px;">
+            <div id="c-ocupantes-cards-grid" class="cards-grid">
+              <!-- Cards do ocupante renderizados aqui -->
+            </div>
+          </div>
+
+          <!-- Modo Compacto -->
+          <div id="c-compact-wrap" style="display: none;" class="table-scroll">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background: var(--slate-50); border-bottom: 1px solid var(--border);">
+                  <th style="padding: 8px 12px; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-align: left; width: 100px;">Matrícula</th>
+                  <th style="padding: 8px 12px; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-align: left;">Nome</th>
+                  <th style="padding: 8px 12px; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-align: left;">Cargo</th>
+                  <th style="padding: 8px 12px; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-align: center; width: 80px;">Símbolo</th>
+                  <th style="padding: 8px 12px; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-align: left; width: 150px;">Portaria</th>
+                  <th style="padding: 8px 12px; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-align: right; width: 120px;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="c-ocupantes-compact-tbody">
+                <!-- Linhas compactas renderizadas aqui -->
+              </tbody>
+            </table>
+          </div>
         </div>
+
         <div class="table-footer">
           <span id="c-ocupantes-footer-lbl">Listagem de nomeados FOPAG</span>
           <span>Prefeitura Municipal de Miracema</span>
@@ -1766,6 +1810,7 @@ const state = {
   cargoAtivo:    null,
   isEditMode:    false,
   viewMode:      'table',   // 'table' | 'cards' | 'compact'
+  comissionadosViewMode: 'table', // 'table' | 'cards' | 'compact'
   leisHistorico: [],
   lhSortOrder:   'asc',
 };
@@ -2509,6 +2554,7 @@ function setView(v, btn) {
     document.querySelector('#header h1').textContent = 'Controle de Cargos Comissionados';
     document.querySelector('#header p').textContent = 'Gestão de ocupantes, nomeações, portarias e símbolos de vencimento';
     $('comissionados-wrap').style.display = 'block';
+    setComissionadosViewMode(state.comissionadosViewMode || 'table');
     carregarOcupantes();
   } else {
     $('stats-bar').style.display = 'grid';
@@ -2904,9 +2950,10 @@ async function carregarOcupantes() {
     const r = await fetch(url);
     const ocupantes = await r.json();
     
-    const tbody = $('c-ocupantes-tbody');
     $('c-ocupantes-count').textContent = `${ocupantes.length} ocupante${ocupantes.length !== 1 ? 's' : ''}`;
     
+    // 1. Renderizar Modo Tabela
+    const tbody = $('c-ocupantes-tbody');
     if (ocupantes.length === 0) {
       tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Nenhum ocupante encontrado.</td></tr>`;
     } else {
@@ -2936,10 +2983,86 @@ async function carregarOcupantes() {
       }).join('');
     }
     
+    // 2. Renderizar Modo Cartões
+    const cardsGrid = $('c-ocupantes-cards-grid');
+    if (ocupantes.length === 0) {
+      cardsGrid.innerHTML = `<div style="grid-column: 1/-1;" class="empty-state">Nenhum ocupante encontrado.</div>`;
+    } else {
+      cardsGrid.innerHTML = ocupantes.map(o => {
+        const dataNom = o.data_nomeacao ? o.data_nomeacao.split('-').reverse().join('/') : '—';
+        return `
+          <div class="cargo-card" style="cursor: pointer;" onclick="abrirDrawer(${o.cargo_id}, true)">
+            <div class="card-top vigor"></div>
+            <div class="card-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; flex: 1;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between;">
+                <span>Matrícula: ${o.matricula}</span>
+                <span>${o.simbolo_vencimento || '—'}</span>
+              </div>
+              <div style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${o.nome}">
+                ${o.nome}
+              </div>
+              <div style="font-size: 12px; font-weight: 600; color: var(--blue-primary); height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${o.cargo_nome}">
+                ${o.cargo_nome}
+              </div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: flex; flex-direction: column; gap: 3px; border-top: 1px solid var(--slate-100); padding-top: 8px;">
+                <div><strong>Portaria:</strong> ${o.portaria || '—'} ${o.boletim_oficial ? `<span style="color:var(--text-muted);">(${o.boletim_oficial})</span>` : ''}</div>
+                <div><strong>Nomeação:</strong> ${dataNom}</div>
+              </div>
+              <div style="display: flex; gap: 6px; margin-top: auto; padding-top: 8px;">
+                <span class="badge ${o.tipo_recrutamento === 'Amplo' ? 'badge-delib-salvo' : o.tipo_recrutamento === 'Limitado' ? 'badge-delib-env' : 'badge-delib-nao'}" style="font-size: 10px;">
+                  Rec. ${o.tipo_recrutamento || '—'}
+                </span>
+              </div>
+            </div>
+            <div class="card-foot" style="padding: 10px 20px; background: var(--slate-50); display: flex; justify-content: flex-end; gap: 8px;" onclick="event.stopPropagation()">
+              <button class="action-btn" onclick="abrirModalOcupanteEdicao(${o.id})" title="Editar Ocupante">✏️</button>
+              <button class="action-btn" style="color:var(--danger-text);" onclick="exonerarOcupante(${o.id})" title="Exonerar Ocupante">Exonerar</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 3. Renderizar Modo Compacto
+    const tbodyCompact = $('c-ocupantes-compact-tbody');
+    if (ocupantes.length === 0) {
+      tbodyCompact.innerHTML = `<tr><td colspan="6" class="empty-state">Nenhum ocupante encontrado.</td></tr>`;
+    } else {
+      tbodyCompact.innerHTML = ocupantes.map(o => {
+        return `
+          <tr class="data-row" style="border-bottom: 1px solid var(--border);" onclick="abrirDrawer(${o.cargo_id}, true)">
+            <td style="padding: 8px 12px; font-family: monospace; font-size: 12px; color: var(--text-secondary); font-weight: 600;">${o.matricula}</td>
+            <td style="padding: 8px 12px; font-weight: 700; font-size: 12.5px; color: var(--text-primary);">${o.nome}</td>
+            <td style="padding: 8px 12px; font-size: 12px; color: var(--blue-primary); font-weight: 600; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${o.cargo_nome}</td>
+            <td style="padding: 8px 12px; font-size: 12px; text-align: center; font-weight: 600;">${o.simbolo_vencimento || '—'}</td>
+            <td style="padding: 8px 12px; font-size: 12px; color: var(--text-secondary);">${o.portaria || '—'}</td>
+            <td style="padding: 8px 12px; text-align: right;" onclick="event.stopPropagation()">
+              <button class="action-btn" style="padding: 2px 4px; font-size: 11px;" onclick="abrirModalOcupanteEdicao(${o.id})">✏️</button>
+              <button class="action-btn" style="color:var(--danger-text); padding: 2px 4px; font-size: 11px;" onclick="exonerarOcupante(${o.id})">Exonerar</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+    
     await carregarStatsComissionados();
   } catch (e) {
     toast('Erro ao carregar ocupantes: ' + e.message, 'err');
   }
+}
+
+function setComissionadosViewMode(mode) {
+  state.comissionadosViewMode = mode;
+  
+  // Atualizar botões de toggle
+  ['table', 'cards', 'compact'].forEach(m => {
+    $('c-vbtn-' + m).classList.toggle('active', m === mode);
+  });
+  
+  // Mostrar/ocultar os containers correspondentes
+  $('c-table-wrap').style.display = mode === 'table' ? '' : 'none';
+  $('c-cards-wrap').style.display = mode === 'cards' ? 'block' : 'none';
+  $('c-compact-wrap').style.display = mode === 'compact' ? 'block' : 'none';
 }
 
 async function carregarStatsComissionados() {

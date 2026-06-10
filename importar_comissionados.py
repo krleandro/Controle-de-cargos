@@ -21,14 +21,12 @@ def normalize_symbol(s):
     if 'SS' in s: return 'SS'
     if 'SP' in s: return 'SP'
     
-    # CC-1, CC-2... -> CC1, CC2...
     m = re.match(r'CC\s*-\s*(\d)', s)
     if m:
         return f"CC{m.group(1)}"
     if s in ('CC1', 'CC2', 'CC3', 'CC4', 'CC5', 'CC6'):
         return s
         
-    # FG - 1,00, FG - 0,60... -> FGDE 1, FGDE 2...
     if 'FG' in s:
         m = re.search(r'0[.,](\d+)', s)
         if m:
@@ -56,7 +54,6 @@ def normalize_recrutamento(r):
 def clean_matricula(m):
     if not m or pd.isna(m): return ""
     try:
-        # Convert float to int, then to string
         return str(int(float(str(m).strip())))
     except:
         return str(m).strip()
@@ -83,24 +80,73 @@ if 'secretaria' not in cols:
     con.execute("ALTER TABLE Cargos ADD COLUMN secretaria TEXT;")
     con.commit()
 
+# Reset total_ocupados to 0 for all comissionado/eletivo cargos
+print("Resetando contagem de ocupados para cargos comissionados/eletivos...")
+con.execute("UPDATE Cargos SET total_ocupados = 0 WHERE tipo_provimento IN ('Comissão', 'Eletivo')")
+con.commit()
 
-# 1. Clear existing occupants
+# Clear existing occupants
 print("Limpando tabela Ocupantes...")
 con.execute("DELETE FROM Ocupantes")
 con.commit()
 
-# Load all cargos into memory for quick lookup
-def load_cargos_map():
-    rows = con.execute("SELECT id, nome FROM Cargos").fetchall()
-    return {normalize_name(r[1]): r[0] for r in rows}
+# Load all cargos into memory for matching
+def load_db_cargos():
+    rows = con.execute("SELECT id, nome, secretaria, tipo_provimento FROM Cargos").fetchall()
+    return [{
+        'id': r[0],
+        'nome': r[1],
+        'norm_nome': normalize_name(r[1]),
+        'secretaria': r[2],
+        'norm_sec': normalize_name(r[2]) if r[2] else None,
+        'tipo': r[3]
+    } for r in rows]
 
-cargos_map = load_cargos_map()
+db_cargos = load_db_cargos()
 
 # Load Excel File
-xl = pd.ExcelFile(XLSX_PATH)
+try:
+    xl = pd.ExcelFile(XLSX_PATH)
+except PermissionError:
+    print(f"[Aviso] Arquivo '{XLSX_PATH}' está aberto no Excel e travado. Lendo de 'temp_check.xlsx' como alternativa.")
+    xl = pd.ExcelFile("temp_check.xlsx")
 
-total_imported = 0
-total_cargos_created = 0
+# Temporary data structure for parsed rows
+grouped_cargos = {}
+
+def add_to_group(cargo_name, secretaria, nome, matricula, portaria, vagas_existentes, simbolo_raw, recrutamento_raw, tipo_prov):
+    norm_cargo = normalize_name(cargo_name)
+    norm_sec = normalize_name(secretaria)
+    key = (norm_cargo, norm_sec)
+    
+    if key not in grouped_cargos:
+        grouped_cargos[key] = {
+            'cargo_name': cargo_name,
+            'secretaria': secretaria,
+            'tipo_provimento': tipo_prov,
+            'simbolos': [],
+            'recrutamentos': [],
+            'vagas': [],
+            'occupants': []
+        }
+        
+    group = grouped_cargos[key]
+    
+    if simbolo_raw:
+        group['simbolos'].append(simbolo_raw)
+    if recrutamento_raw:
+        group['recrutamentos'].append(recrutamento_raw)
+    if vagas_existentes is not None:
+        group['vagas'].append(vagas_existentes)
+        
+    if nome:
+        group['occupants'].append({
+            'nome': nome,
+            'matricula': matricula,
+            'portaria': portaria,
+            'simbolo_raw': simbolo_raw,
+            'recrutamento_raw': recrutamento_raw
+        })
 
 # --- Tab 1: CC ---
 print("\nProcessando aba 'CC'...")
@@ -108,35 +154,90 @@ df_cc = xl.parse('CC', header=None)
 current_secretaria = "GABINETE DO PREFEITO"
 
 for idx, row in df_cc.iloc[2:].iterrows():
-    # Detecta cabeçalhos de seção (secretarias)
     if pd.notna(row[0]) and pd.isna(row[1]) and pd.isna(row[2]) and pd.isna(row[3]):
         sec_val = str(row[0]).strip()
         if "QUADRO DE CARGOS" not in sec_val.upper():
             current_secretaria = sec_val
         continue
 
-    nome = clean_str(row[2])
     cargo_name = clean_str(row[3])
-    
-    if not nome or not cargo_name:
+    if not cargo_name:
         continue
         
+    nome = clean_str(row[2])
     matricula = clean_matricula(row[0])
     portaria = clean_str(row[1])
-    vagas_existentes = clean_int(row[4], 1)
+    vagas_existentes = clean_int(row[4], None)
     simbolo_raw = clean_str(row[6])
     recrutamento_raw = clean_str(row[8])
+    tipo_prov = 'Eletivo' if recrutamento_raw == 'ELETIVO' else 'Comissão'
     
+    add_to_group(cargo_name, current_secretaria, nome, matricula, portaria, vagas_existentes, simbolo_raw, recrutamento_raw, tipo_prov)
+
+# --- Tab 2: Conselho Tutelar ---
+print("\nProcessando aba 'Conselho Tutelar'...")
+df_ct = xl.parse('Conselho Tutelar', header=None)
+for idx, row in df_ct.iloc[1:].iterrows():
+    cargo_name = clean_str(row[3])
+    if not cargo_name:
+        continue
+    nome = clean_str(row[2])
+    matricula = clean_matricula(row[0])
+    portaria = clean_str(row[1])
+    vagas_existentes = clean_int(row[4], None)
+    simbolo_raw = clean_str(row[6]) or 'CC-2'
+    
+    add_to_group(cargo_name, 'SECRETARIA MUNICIPAL DE PROMOÇÃO E BEM ESTAR SOCIAL', nome, matricula, portaria, vagas_existentes, simbolo_raw, 'Amplo', 'Comissão')
+
+# --- Tab 3: Diretores de Escola ---
+print("\nProcessando aba 'Diretores de Escola'...")
+df_de = xl.parse('Diretores de Escola', header=None)
+for idx, row in df_de.iterrows():
+    cargo_name = clean_str(row[3])
+    if not cargo_name:
+        continue
+    nome = clean_str(row[2])
+    matricula = clean_matricula(row[0])
+    portaria = clean_str(row[1])
+    vagas_existentes = clean_int(row[4], None)
+    simbolo_raw = clean_str(row[6])
+    
+    add_to_group(cargo_name, 'SECRETARIA MUNICIPAL DE EDUCAÇÃO', nome, matricula, portaria, vagas_existentes, simbolo_raw, 'Amplo', 'Comissão')
+
+# Process grouped data and write to DB
+total_imported = 0
+total_cargos_created = 0
+
+def encontrar_ou_criar_cargo_db(cargo_name, current_secretaria, tipo_prov, simbolo_raw, recrutamento_raw, total_vagas):
     norm_cargo = normalize_name(cargo_name)
+    norm_sec = normalize_name(current_secretaria) if current_secretaria else None
     
-    # Check if cargo exists
-    if norm_cargo in cargos_map:
-        cargo_id = cargos_map[norm_cargo]
-        tipo_prov = 'Eletivo' if recrutamento_raw == 'ELETIVO' else 'Comissão'
-        simbolo_cargo = normalize_symbol(simbolo_raw)
-        recrutamento_cargo = normalize_recrutamento(recrutamento_raw)
-        if recrutamento_cargo == 'Outro':
-            recrutamento_cargo = None
+    # 1. Tentar encontrar match exato por nome AND secretaria
+    match = None
+    for c in db_cargos:
+        if c['norm_nome'] == norm_cargo and c['norm_sec'] == norm_sec:
+            match = c
+            break
+            
+    # 2. Se não encontrar, tentar encontrar match por nome com secretaria NULL
+    if not match:
+        for c in db_cargos:
+            if c['norm_nome'] == norm_cargo and c['norm_sec'] is None:
+                match = c
+                # Vincula este cargo à secretaria no banco de dados
+                con.execute("UPDATE Cargos SET secretaria = ? WHERE id = ?", (current_secretaria, c['id']))
+                c['secretaria'] = current_secretaria
+                c['norm_sec'] = norm_sec
+                break
+                
+    simbolo_cargo = normalize_symbol(simbolo_raw)
+    recrutamento_cargo = normalize_recrutamento(recrutamento_raw)
+    if recrutamento_cargo == 'Outro':
+        recrutamento_cargo = None
+        
+    global total_cargos_created
+    if match:
+        cargo_id = match['id']
         con.execute("""
             UPDATE Cargos
             SET tipo_provimento = ?,
@@ -145,152 +246,59 @@ for idx, row in df_cc.iloc[2:].iterrows():
                 total_previstos = ?,
                 secretaria = ?
             WHERE id = ?
-        """, (tipo_prov, simbolo_cargo, recrutamento_cargo, vagas_existentes, current_secretaria, cargo_id))
-
+        """, (tipo_prov, simbolo_cargo, recrutamento_cargo, total_vagas, current_secretaria, cargo_id))
     else:
-        # Create cargo
-        tipo_prov = 'Eletivo' if recrutamento_raw == 'ELETIVO' else 'Comissão'
-        simbolo_cargo = normalize_symbol(simbolo_raw)
-        recrutamento_cargo = normalize_recrutamento(recrutamento_raw)
-        if recrutamento_cargo == 'Outro':
-            recrutamento_cargo = None
-            
+        # Criar cargo novo
         cur = con.execute("""
             INSERT INTO Cargos
               (nome, situacao, tipo_provimento, simbolo_vencimento, recrutamento, total_previstos, total_ocupados, secretaria)
             VALUES (?, 'Em vigor', ?, ?, ?, ?, 0, ?)
-        """, (cargo_name, tipo_prov, simbolo_cargo, recrutamento_cargo, vagas_existentes, current_secretaria))
+        """, (cargo_name, tipo_prov, simbolo_cargo, recrutamento_cargo, total_vagas, current_secretaria))
         cargo_id = cur.lastrowid
-        cargos_map[norm_cargo] = cargo_id
         total_cargos_created += 1
-
         
-    # Insert occupant
-    con.execute("""
-        INSERT INTO Ocupantes
-          (cargo_id, nome, matricula, tipo_recrutamento, simbolo_vencimento, portaria, data_nomeacao)
-        VALUES (?, ?, ?, ?, ?, ?, NULL)
-    """, (
-        cargo_id, nome, matricula,
-        normalize_recrutamento(recrutamento_raw),
-        normalize_symbol(simbolo_raw),
-        portaria
-    ))
-    total_imported += 1
-
-# --- Tab 2: Conselho Tutelar ---
-print("\nProcessando aba 'Conselho Tutelar'...")
-df_ct = xl.parse('Conselho Tutelar', header=None)
-for idx, row in df_ct.iloc[1:].iterrows():
-    nome = clean_str(row[2])
-    cargo_name = clean_str(row[3])
-    
-    if not nome or not cargo_name:
-        continue
+        new_cargo = {
+            'id': cargo_id,
+            'nome': cargo_name,
+            'norm_nome': norm_cargo,
+            'secretaria': current_secretaria,
+            'norm_sec': norm_sec,
+            'tipo': tipo_prov
+        }
+        db_cargos.append(new_cargo)
         
-    matricula = clean_matricula(row[0])
-    portaria = clean_str(row[1])
-    vagas_existentes = clean_int(row[4], 5)
-    simbolo_raw = clean_str(row[6]) or 'CC-2'
+    return cargo_id
+
+print("\nGravando cargos e ocupantes no banco de dados...")
+for key, g in grouped_cargos.items():
+    cargo_name = g['cargo_name']
+    secretaria = g['secretaria']
+    tipo_prov = g['tipo_provimento']
     
-    norm_cargo = normalize_name(cargo_name)
+    # Calculate sum of vacancies
+    total_vagas = sum(g['vagas'])
+    if total_vagas == 0:
+        total_vagas = 1
+        
+    # Get the representative symbol and recruitment
+    simbolo_raw = g['simbolos'][0] if g['simbolos'] else None
+    recrutamento_raw = g['recrutamentos'][0] if g['recrutamentos'] else None
     
-    # Check if cargo exists
-    if norm_cargo in cargos_map:
-        cargo_id = cargos_map[norm_cargo]
-        simbolo_cargo = normalize_symbol(simbolo_raw)
+    cargo_id = encontrar_ou_criar_cargo_db(cargo_name, secretaria, tipo_prov, simbolo_raw, recrutamento_raw, total_vagas)
+    
+    # Insert occupants
+    for occ in g['occupants']:
         con.execute("""
-            UPDATE Cargos
-            SET tipo_provimento = 'Comissão',
-                simbolo_vencimento = COALESCE(simbolo_vencimento, ?),
-                recrutamento = 'Amplo',
-                total_previstos = ?,
-                secretaria = ?
-            WHERE id = ?
-        """, (simbolo_cargo, vagas_existentes, 'SECRETARIA MUNICIPAL DE PROMOÇÃO E BEM ESTAR SOCIAL', cargo_id))
-
-    else:
-        # Create cargo
-        simbolo_cargo = normalize_symbol(simbolo_raw)
-        cur = con.execute("""
-            INSERT INTO Cargos
-              (nome, situacao, tipo_provimento, simbolo_vencimento, recrutamento, total_previstos, total_ocupados, secretaria)
-            VALUES (?, 'Em vigor', 'Comissão', ?, 'Amplo', ?, 0, ?)
-        """, (cargo_name, simbolo_cargo, vagas_existentes, 'SECRETARIA MUNICIPAL DE PROMOÇÃO E BEM ESTAR SOCIAL'))
-        cargo_id = cur.lastrowid
-        cargos_map[norm_cargo] = cargo_id
-        total_cargos_created += 1
-
-        
-    # Insert occupant
-    con.execute("""
-        INSERT INTO Ocupantes
-          (cargo_id, nome, matricula, tipo_recrutamento, simbolo_vencimento, portaria, data_nomeacao)
-        VALUES (?, ?, ?, ?, ?, ?, NULL)
-    """, (
-        cargo_id, nome, matricula,
-        'Amplo',
-        normalize_symbol(simbolo_raw),
-        portaria
-    ))
-    total_imported += 1
-
-# --- Tab 3: Diretores de Escola ---
-print("\nProcessando aba 'Diretores de Escola'...")
-df_de = xl.parse('Diretores de Escola', header=None)
-for idx, row in df_de.iterrows():
-    nome = clean_str(row[2])
-    cargo_name = clean_str(row[3])
-    
-    if not nome or not cargo_name:
-        continue
-        
-    matricula = clean_matricula(row[0])
-    portaria = clean_str(row[1])
-    vagas_existentes = clean_int(row[4], 1)
-    simbolo_raw = clean_str(row[6])
-    
-    norm_cargo = normalize_name(cargo_name)
-    
-    # Check if cargo exists
-    if norm_cargo in cargos_map:
-        cargo_id = cargos_map[norm_cargo]
-        simbolo_cargo = normalize_symbol(simbolo_raw)
-        con.execute("""
-            UPDATE Cargos
-            SET tipo_provimento = 'Comissão',
-                simbolo_vencimento = COALESCE(simbolo_vencimento, ?),
-                recrutamento = 'Amplo',
-                total_previstos = ?,
-                secretaria = ?
-            WHERE id = ?
-        """, (simbolo_cargo, vagas_existentes, 'SECRETARIA MUNICIPAL DE EDUCAÇÃO', cargo_id))
-
-    else:
-        # Create cargo
-        simbolo_cargo = normalize_symbol(simbolo_raw)
-        cur = con.execute("""
-            INSERT INTO Cargos
-              (nome, situacao, tipo_provimento, simbolo_vencimento, recrutamento, total_previstos, total_ocupados, secretaria)
-            VALUES (?, 'Em vigor', 'Comissão', ?, 'Amplo', ?, 0, ?)
-        """, (cargo_name, simbolo_cargo, vagas_existentes, 'SECRETARIA MUNICIPAL DE EDUCAÇÃO'))
-        cargo_id = cur.lastrowid
-        cargos_map[norm_cargo] = cargo_id
-        total_cargos_created += 1
-
-        
-    # Insert occupant
-    con.execute("""
-        INSERT INTO Ocupantes
-          (cargo_id, nome, matricula, tipo_recrutamento, simbolo_vencimento, portaria, data_nomeacao)
-        VALUES (?, ?, ?, ?, ?, ?, NULL)
-    """, (
-        cargo_id, nome, matricula,
-        'Amplo',
-        normalize_symbol(simbolo_raw),
-        portaria
-    ))
-    total_imported += 1
+            INSERT INTO Ocupantes
+              (cargo_id, nome, matricula, tipo_recrutamento, simbolo_vencimento, portaria, data_nomeacao)
+            VALUES (?, ?, ?, ?, ?, ?, NULL)
+        """, (
+            cargo_id, occ['nome'], occ['matricula'],
+            normalize_recrutamento(occ['recrutamento_raw']),
+            normalize_symbol(occ['simbolo_raw']),
+            occ['portaria']
+        ))
+        total_imported += 1
 
 con.commit()
 con.close()

@@ -708,8 +708,9 @@ def criar_ocupante():
         cargo = con.execute("SELECT tipo_provimento FROM Cargos WHERE id = ?", (cargo_id,)).fetchone()
         if not cargo:
             abort(404, description="Cargo não encontrado")
-        if cargo["tipo_provimento"] not in ("Comissão", "Comissao"):
-            abort(400, description="Ocupantes só podem ser cadastrados para cargos comissionados.")
+        if cargo["tipo_provimento"] not in ("Comissão", "Comissao", "Eletivo"):
+            abort(400, description="Ocupantes só podem ser cadastrados para cargos comissionados ou eletivos.")
+
             
         cur = con.execute("""
             INSERT INTO Ocupantes
@@ -746,8 +747,9 @@ def atualizar_ocupante(ocupante_id):
         cargo = con.execute("SELECT tipo_provimento FROM Cargos WHERE id = ?", (cargo_id,)).fetchone()
         if not cargo:
             abort(404, description="Cargo não encontrado")
-        if cargo["tipo_provimento"] not in ("Comissão", "Comissao"):
-            abort(400, description="Ocupantes só podem ser cadastrados para cargos comissionados.")
+        if cargo["tipo_provimento"] not in ("Comissão", "Comissao", "Eletivo"):
+            abort(400, description="Ocupantes só podem ser cadastrados para cargos comissionados ou eletivos.")
+
             
         con.execute("""
             UPDATE Ocupantes SET

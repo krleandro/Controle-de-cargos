@@ -311,3 +311,24 @@ BEGIN
     WHERE id = OLD.cargo_id;
 END;
 
+
+-- =============================================================================
+-- BLOCO 9 — TABELA DE AUDITORIA: Histórico de Exonerações
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS HistoricoExoneracoes (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome                    TEXT    NOT NULL,
+    matricula               TEXT    NOT NULL,
+    cargo_id                INTEGER REFERENCES Cargos (id) ON DELETE SET NULL,
+    cargo_nome              TEXT    NOT NULL,
+    secretaria              TEXT,
+    portaria_nomeacao       TEXT,
+    data_nomeacao           TEXT,
+    data_exoneracao         TEXT    NOT NULL,  -- YYYY-MM-DD
+    portaria_exoneracao     TEXT    NOT NULL,
+    boletim_exoneracao      TEXT    NOT NULL,
+    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+

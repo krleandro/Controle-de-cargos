@@ -4,7 +4,7 @@ from datetime import datetime
 
 from flask import Flask, request, jsonify, send_file, render_template, abort
 
-from relatorio_pdf import gerar_relatorio, gerar_relatorio_consolidado
+from relatorio_pdf import gerar_relatorio, gerar_relatorio_consolidado, gerar_relatorio_comissionados_secretaria
 
 # ── Caminhos ──────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent
@@ -101,6 +101,26 @@ def executar_migracao():
             """)
             con.commit()
             print("[MIGRAÇÃO] Tabela Ocupantes e triggers criadas com sucesso.")
+
+        # Criar a tabela HistoricoExoneracoes se não existir
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS HistoricoExoneracoes (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome                    TEXT    NOT NULL,
+                matricula               TEXT    NOT NULL,
+                cargo_id                INTEGER REFERENCES Cargos (id) ON DELETE SET NULL,
+                cargo_nome              TEXT    NOT NULL,
+                secretaria              TEXT,
+                portaria_nomeacao       TEXT,
+                data_nomeacao           TEXT,
+                data_exoneracao         TEXT    NOT NULL,  -- YYYY-MM-DD
+                portaria_exoneracao     TEXT    NOT NULL,
+                boletim_exoneracao      TEXT    NOT NULL,
+                criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+        """)
+        con.commit()
+        print("[MIGRAÇÃO] Tabela HistoricoExoneracoes verificada/criada.")
     except Exception as e:
         print(f"[ERRO MIGRAÇÃO] Falha ao rodar migrações: {e}")
     finally:
@@ -637,6 +657,80 @@ def relatorios_consolidado():
     )
 
 
+@app.route("/api/relatorios/comissionados_secretaria", methods=["GET"])
+def relatorios_comissionados_secretaria():
+    con = get_db_connection()
+    try:
+        # 1. Stats
+        res_stats = con.execute("""
+            SELECT
+              COUNT(*)                                           AS total_cargos,
+              COALESCE(SUM(total_previstos), 0)                 AS total_previstos,
+              COALESCE(SUM(total_ocupados), 0)                  AS total_ocupados,
+              COALESCE(SUM(saldo_vagas), 0)                     AS total_saldo,
+              COALESCE(SUM(CASE WHEN saldo_vagas < 0 THEN 1 ELSE 0 END), 0)  AS alertas
+            FROM vw_SaldoVagas
+            WHERE tipo_provimento IN ('Comissão', 'Eletivo')
+        """).fetchone()
+        stats = dict(res_stats)
+
+        # 2. Secretarias summary
+        res_secs = con.execute("""
+            SELECT
+              COALESCE(NULLIF(secretaria, ''), 'Não Informada')  AS secretaria,
+              COUNT(*)                                           AS cargos_count,
+              COALESCE(SUM(total_previstos), 0)                 AS vagas_previstas,
+              COALESCE(SUM(total_ocupados), 0)                  AS vagas_ocupadas,
+              COALESCE(SUM(saldo_vagas), 0)                     AS saldo
+            FROM vw_SaldoVagas
+            WHERE tipo_provimento IN ('Comissão', 'Eletivo')
+            GROUP BY secretaria
+            ORDER BY secretaria COLLATE NOCASE
+        """).fetchall()
+        secretarias_summary = [dict(s) for s in res_secs]
+
+        # 3. Ocupantes grouped
+        res_ocup = con.execute("SELECT id, cargo_id, nome, matricula, portaria FROM Ocupantes ORDER BY nome").fetchall()
+        ocupantes_by_cargo = {}
+        for o in res_ocup:
+            o_dict = dict(o)
+            ocupantes_by_cargo.setdefault(o_dict["cargo_id"], []).append(o_dict)
+
+        # 4. Cargos by Sec
+        res_cargos = con.execute("""
+            SELECT id, nome, COALESCE(NULLIF(secretaria, ''), 'Não Informada') AS sec_name,
+                   total_previstos, total_ocupados, saldo_vagas, simbolo_vencimento, recrutamento
+            FROM vw_SaldoVagas
+            WHERE tipo_provimento IN ('Comissão', 'Eletivo')
+            ORDER BY sec_name COLLATE NOCASE, nome COLLATE NOCASE
+        """).fetchall()
+
+        cargos_by_sec = {}
+        for c in res_cargos:
+            c_dict = dict(c)
+            c_dict["ocupantes"] = ocupantes_by_cargo.get(c_dict["id"], [])
+            sec = c_dict["sec_name"]
+            cargos_by_sec.setdefault(sec, []).append(c_dict)
+
+    finally:
+        con.close()
+
+    import io
+    try:
+        pdf_bytes = gerar_relatorio_comissionados_secretaria(stats, secretarias_summary, cargos_by_sec)
+    except Exception as e:
+        abort(500, description=f"Erro ao gerar PDF por Secretaria: {e}")
+
+    filename = f"Relatorio_Comissionados_Secretaria_FOPAG_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename
+    )
+
+
 @app.route("/api/leis/historico", methods=["GET"])
 def leis_historico():
     con = get_db_connection()
@@ -813,6 +907,80 @@ def deletar_ocupante(ocupante_id):
         con.execute("DELETE FROM Ocupantes WHERE id = ?", (ocupante_id,))
         con.commit()
         return jsonify({"mensagem": "Ocupante exonerado/excluído com sucesso."})
+    finally:
+        con.close()
+
+
+@app.route("/api/ocupantes/<int:ocupante_id>/exonerar", methods=["POST"])
+def exonerar_ocupante_com_historico(ocupante_id):
+    """Exonera um ocupante e registra no histórico de exonerações."""
+    dados = request.get_json() or {}
+    data_exoneracao = dados.get("data_exoneracao")
+    portaria_exoneracao = dados.get("portaria_exoneracao")
+    boletim_exoneracao = dados.get("boletim_exoneracao")
+
+    if not data_exoneracao or not portaria_exoneracao or not boletim_exoneracao:
+        abort(400, description="Os campos data_exoneracao, portaria_exoneracao e boletim_exoneracao são obrigatórios.")
+
+    con = get_db_connection()
+    try:
+        # Recupera dados do ocupante e do cargo associado
+        row = con.execute("""
+            SELECT o.nome, o.matricula, o.cargo_id, o.portaria AS portaria_nomeacao, o.data_nomeacao,
+                   c.nome AS cargo_nome, c.secretaria
+            FROM Ocupantes o
+            JOIN Cargos c ON o.cargo_id = c.id
+            WHERE o.id = ?
+        """, (ocupante_id,)).fetchone()
+
+        if not row:
+            abort(404, description="Ocupante não encontrado")
+
+        ocup = dict(row)
+
+        # Insere no histórico
+        con.execute("""
+            INSERT INTO HistoricoExoneracoes (
+                nome, matricula, cargo_id, cargo_nome, secretaria,
+                portaria_nomeacao, data_nomeacao,
+                data_exoneracao, portaria_exoneracao, boletim_exoneracao
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            ocup["nome"], ocup["matricula"], ocup["cargo_id"], ocup["cargo_nome"], ocup["secretaria"],
+            ocup["portaria_nomeacao"], ocup["data_nomeacao"],
+            data_exoneracao, portaria_exoneracao, boletim_exoneracao
+        ))
+
+        # Deleta de Ocupantes (isso também atualiza total_ocupados no cargo via trigger)
+        con.execute("DELETE FROM Ocupantes WHERE id = ?", (ocupante_id,))
+        con.commit()
+        return jsonify({"mensagem": "Ocupante exonerado com sucesso e registrado no histórico."})
+    finally:
+        con.close()
+
+
+@app.route("/api/ocupantes/historico", methods=["GET"])
+def listar_historico_exoneracoes():
+    """Lista o histórico de servidores exonerados."""
+    q = request.args.get("q", "").strip()
+    con = get_db_connection()
+    try:
+        if q:
+            query = """
+                SELECT * FROM HistoricoExoneracoes
+                WHERE nome LIKE ? OR matricula LIKE ? OR cargo_nome LIKE ? OR secretaria LIKE ?
+                ORDER BY data_exoneracao DESC, nome COLLATE NOCASE
+            """
+            like_q = f"%{q}%"
+            rows = con.execute(query, (like_q, like_q, like_q, like_q)).fetchall()
+        else:
+            query = """
+                SELECT * FROM HistoricoExoneracoes
+                ORDER BY data_exoneracao DESC, nome COLLATE NOCASE
+            """
+            rows = con.execute(query).fetchall()
+
+        return jsonify([dict(r) for r in rows])
     finally:
         con.close()
 

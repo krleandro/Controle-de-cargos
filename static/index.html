@@ -1213,7 +1213,13 @@
             <h3 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0;">Relação de Ocupantes de Cargos Comissionados</h3>
             <span id="c-ocupantes-count" style="font-size: 11px; font-weight: 700; background: var(--bg-xlightblue); color: var(--blue-primary); padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid var(--blue-light);">0 ocupantes</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <button class="btn-primary" onclick="confirmarBaixarRelatorioSecretaria()" style="background: linear-gradient(135deg, #0f766e, #0d9488); border: none; font-weight: 600; padding: 8px 16px; font-size: 12.5px; height: 38px; display: flex; align-items: center; gap: 6px; border-radius: var(--radius-md); color:#fff; cursor:pointer;" title="Exportar Relatório por Secretaria em PDF">
+              <span>🏢</span> PDF por Secretaria
+            </button>
+            <button class="btn-outline" onclick="abrirModalHistoricoExoneracoes()" style="border: 1px solid var(--border); background: var(--bg-card); font-weight: 600; padding: 8px 16px; font-size: 12.5px; height: 38px; display: flex; align-items: center; gap: 6px; border-radius: var(--radius-md); color:var(--text-primary); cursor:pointer;" title="Visualizar histórico de servidores exonerados">
+              <span>📜</span> Ver Histórico
+            </button>
             <select id="ocupante-filtro-secretaria" onchange="carregarOcupantes()" style="padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--slate-50); outline: none; font-size: 12.5px; cursor: pointer; max-width: 220px; color: var(--text-primary);">
               <option value="Todas">Todas as Secretarias</option>
             </select>
@@ -1293,9 +1299,12 @@
 
     <!-- Relatórios Gerenciais -->
     <div id="relatorios-wrap" style="display: none; margin: 24px 32px 0; animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);">
-      <!-- Botão de exportação principal no topo -->
-      <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-        <button class="btn-primary" onclick="abrirModalFiltroRelatorio()" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: none; font-weight: 600; padding: 12px 24px; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md);">
+      <!-- Botões de exportação principal no topo -->
+      <div style="display: flex; justify-content: flex-end; gap: 16px; margin-bottom: 20px;">
+        <button class="btn-primary" onclick="confirmarBaixarRelatorioSecretaria()" style="background: linear-gradient(135deg, #0f766e, #0d9488); border: none; font-weight: 600; padding: 12px 24px; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md); color:#fff; cursor:pointer;">
+          <span>🏢</span> Exportar Relatório por Secretaria (PDF)
+        </button>
+        <button class="btn-primary" onclick="abrirModalFiltroRelatorio()" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: none; font-weight: 600; padding: 12px 24px; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md); color:#fff; cursor:pointer;">
           <span>📄</span> Exportar Relatório Executivo Completo (PDF)
         </button>
       </div>
@@ -1591,6 +1600,90 @@
     <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:18px;">
       <button class="btn-ghost" onclick="fecharModalFiltroRelatorio()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:1px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;">Cancelar</button>
       <button class="btn-primary" onclick="confirmarBaixarRelatorioConsolidado()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:none; background:linear-gradient(135deg, var(--blue-primary), #3b82f6); color:#fff; cursor:pointer; box-shadow:var(--shadow-md);">Gerar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: CONFIRMAR EXONERAÇÃO COM DADOS ──────────────────────────────────────── -->
+<div class="overlay" id="overlay-exoneracao" onclick="if(event.target===this)fecharModalExoneracao()">
+  <div class="modal" style="width: 440px;">
+    <div class="modal-header">
+      <div>
+        <h2>Registrar Exoneração</h2>
+        <p style="color:var(--text-secondary); font-size:12px; margin-top:4px;">Informe os dados formais para o histórico de exonerações</p>
+      </div>
+      <button class="close-btn" onclick="fecharModalExoneracao()">×</button>
+    </div>
+    
+    <input type="hidden" id="exo-ocupante-id">
+    
+    <div style="padding: 16px 20px; background: var(--bg-xlightblue); border: 1px solid var(--blue-light); border-radius: var(--radius-md); margin-bottom: 20px; display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 11px; font-weight: 700; color: var(--blue-primary); text-transform: uppercase;">Servidor a ser Exonerado</div>
+      <div id="exo-servidor-nome" style="font-size: 14px; font-weight: 700; color: var(--text-primary);">—</div>
+      <div id="exo-servidor-cargo" style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">—</div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 18px;">
+      <label style="font-weight:600; color:var(--text-primary); font-size:12px; display:block; margin-bottom:6px;">Data de Exoneração *</label>
+      <input type="date" class="form-control" id="exo-data" style="width:100%; height:40px; padding:8px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); outline: none;">
+    </div>
+
+    <div class="form-group" style="margin-bottom: 18px;">
+      <label style="font-weight:600; color:var(--text-primary); font-size:12px; display:block; margin-bottom:6px;">Portaria de Exoneração *</label>
+      <input type="text" class="form-control" id="exo-portaria" placeholder="Ex: 142/2026" style="width:100%; height:40px; padding:8px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); outline: none;">
+    </div>
+
+    <div class="form-group" style="margin-bottom: 24px;">
+      <label style="font-weight:600; color:var(--text-primary); font-size:12px; display:block; margin-bottom:6px;">Boletim Oficial *</label>
+      <input type="text" class="form-control" id="exo-boletim" placeholder="Ex: BO nº 45/2026" style="width:100%; height:40px; padding:8px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); outline: none;">
+    </div>
+
+    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:18px;">
+      <button class="btn-ghost" onclick="fecharModalExoneracao()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:1px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarExoneracaoOcupante()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:none; background:linear-gradient(135deg, var(--danger-text), #ef4444); color:#fff; cursor:pointer; box-shadow:var(--shadow-md);">Confirmar Exoneração</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: HISTÓRICO DE EXONERAÇÕES ────────────────────────────────────────────── -->
+<div class="overlay" id="overlay-historico-exoneracoes" onclick="if(event.target===this)fecharModalHistoricoExoneracoes()">
+  <div class="modal" style="width: 820px; max-width: 95vw;">
+    <div class="modal-header">
+      <div>
+        <h2>Histórico de Servidores Exonerados</h2>
+        <p style="color:var(--text-secondary); font-size:12px; margin-top:4px;">Relação de servidores que deixaram os cargos comissionados ou eletivos</p>
+      </div>
+      <button class="close-btn" onclick="fecharModalHistoricoExoneracoes()">×</button>
+    </div>
+    
+    <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
+      <div class="search-wrap" style="flex: 1; position: relative;">
+        <span class="search-icon" style="position: absolute; left: 12px; top: 11px; font-size: 14px; color: var(--text-muted);">🔍</span>
+        <input id="historico-exo-search" type="text" placeholder="Buscar por nome, matrícula, cargo ou secretaria..." oninput="debouncedCarregarHistorico()" style="width: 100%; padding: 10px 12px 10px 38px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--slate-50); outline: none; font-size: 13px;">
+      </div>
+    </div>
+
+    <div class="table-scroll" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md);">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+        <thead>
+          <tr style="background: #f8fafc; border-bottom: 1px solid var(--border); text-align: left; position: sticky; top: 0; z-index: 10;">
+            <th style="padding: 10px 16px; font-weight: 600; color: var(--text-secondary);">Matrícula</th>
+            <th style="padding: 10px 16px; font-weight: 600; color: var(--text-secondary);">Nome</th>
+            <th style="padding: 10px 16px; font-weight: 600; color: var(--text-secondary);">Cargo Anterior</th>
+            <th style="padding: 10px 16px; font-weight: 600; color: var(--text-secondary);">Secretaria</th>
+            <th style="padding: 10px 16px; font-weight: 600; color: var(--text-secondary); text-align: center;">Nomeação</th>
+            <th style="padding: 10px 16px; font-weight: 600; color: var(--text-secondary); text-align: center;">Exoneração</th>
+            <th style="padding: 10px 16px; font-weight: 600; color: var(--text-secondary);">Ato Exoneração</th>
+          </tr>
+        </thead>
+        <tbody id="historico-exo-tbody">
+          <!-- Gerado dinamicamente -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:18px; margin-top: 18px;">
+      <button class="btn-primary" onclick="fecharModalHistoricoExoneracoes()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:none; background:var(--blue-primary); color:#fff; cursor:pointer;">Fechar</button>
     </div>
   </div>
 </div>
@@ -3372,13 +3465,85 @@ async function submitOcupante() {
   }
 }
 
-async function exonerarOcupante(ocupanteId) {
-  if (!confirm("Tem certeza que deseja exonerar este ocupante?")) return;
+async function confirmarBaixarRelatorioSecretaria() {
   try {
-    const r = await fetch(`/api/ocupantes/${ocupanteId}`, { method: 'DELETE' });
-    const res = await r.json();
-    if (!r.ok) throw new Error(res.detail || 'Erro ao exonerar ocupante');
+    toast('Gerando PDF por secretaria, por favor aguarde...', 'ok');
+    const urlQuery = '/api/relatorios/comissionados_secretaria';
+    const r = await fetch(urlQuery);
+    if (!r.ok) throw new Error('Erro ao baixar relatório por secretaria');
+    const blob = await r.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const data = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    a.download = `Relatorio_Comissionados_Secretaria_FOPAG_${data}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    toast('Relatório por secretaria gerado com sucesso!', 'ok');
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+async function exonerarOcupante(ocupanteId) {
+  try {
+    const r = await fetch(`/api/ocupantes`);
+    const ocupantes = await r.json();
+    const o = ocupantes.find(item => item.id === ocupanteId);
+    if (!o) {
+      toast('Ocupante não encontrado.', 'err');
+      return;
+    }
     
+    $('exo-ocupante-id').value = o.id;
+    $('exo-servidor-nome').textContent = o.nome;
+    $('exo-servidor-cargo').textContent = `${o.cargo_nome} (Matrícula: ${o.matricula})`;
+    
+    const hoje = new Date().toISOString().split('T')[0];
+    $('exo-data').value = hoje;
+    $('exo-portaria').value = '';
+    $('exo-boletim').value = '';
+    
+    $('overlay-exoneracao').classList.add('show');
+  } catch (e) {
+    toast('Erro ao preparar exoneração: ' + e.message, 'err');
+  }
+}
+
+function fecharModalExoneracao() {
+  $('overlay-exoneracao').classList.remove('show');
+}
+
+async function confirmarExoneracaoOcupante() {
+  const id = $('exo-ocupante-id').value;
+  const data_exoneracao = $('exo-data').value;
+  const portaria_exoneracao = $('exo-portaria').value.trim();
+  const boletim_exoneracao = $('exo-boletim').value.trim();
+  
+  if (!data_exoneracao || !portaria_exoneracao || !boletim_exoneracao) {
+    toast('Preencha todos os campos obrigatórios (*)', 'err');
+    return;
+  }
+  
+  const body = {
+    data_exoneracao,
+    portaria_exoneracao,
+    boletim_exoneracao
+  };
+  
+  try {
+    const r = await fetch(`/api/ocupantes/${id}/exonerar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    const res = await r.json();
+    if (!r.ok) throw new Error(res.detail || 'Erro ao realizar exoneração');
+    
+    fecharModalExoneracao();
     toast(res.mensagem, 'ok');
     
     if ($('comissionados-wrap').style.display === 'block') {
@@ -3396,9 +3561,69 @@ async function exonerarOcupante(ocupanteId) {
   }
 }
 
+let debounceHistoricoTimer;
+function debouncedCarregarHistorico() {
+  clearTimeout(debounceHistoricoTimer);
+  debounceHistoricoTimer = setTimeout(() => {
+    carregarHistoricoExoneracoes();
+  }, 280);
+}
+
+function abrirModalHistoricoExoneracoes() {
+  $('historico-exo-search').value = '';
+  carregarHistoricoExoneracoes();
+  $('overlay-historico-exoneracoes').classList.add('show');
+}
+
+function fecharModalHistoricoExoneracoes() {
+  $('overlay-historico-exoneracoes').classList.remove('show');
+}
+
+async function carregarHistoricoExoneracoes() {
+  const query = $('historico-exo-search').value.trim();
+  try {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    const url = `/api/ocupantes/historico?` + params;
+    const r = await fetch(url);
+    const historico = await r.json();
+    
+    const tbody = $('historico-exo-tbody');
+    if (historico.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="padding: 24px; text-align: center; color: var(--text-muted);">Nenhum registro de exoneração encontrado.</td></tr>`;
+    } else {
+      tbody.innerHTML = historico.map(h => {
+        const dtNom = h.data_nomeacao ? h.data_nomeacao.split('-').reverse().join('/') : '—';
+        const dtExo = h.data_exoneracao ? h.data_exoneracao.split('-').reverse().join('/') : '—';
+        return `
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 10px 16px; font-weight:600; color:var(--text-secondary); font-family:monospace;">${h.matricula}</td>
+            <td style="padding: 10px 16px; font-weight:700; color:var(--text-primary);">${h.nome}</td>
+            <td style="padding: 10px 16px; color:var(--blue-primary); font-weight:500;">${h.cargo_nome}</td>
+            <td style="padding: 10px 16px; color:var(--text-secondary);">${h.secretaria || '—'}</td>
+            <td style="padding: 10px 16px; text-align:center;">${dtNom}</td>
+            <td style="padding: 10px 16px; text-align:center; font-weight:600; color:var(--danger-text);">${dtExo}</td>
+            <td style="padding: 10px 16px; color:var(--text-secondary);">Port. ${h.portaria_exoneracao} <span style="font-size:11px; color:var(--text-muted);">(${h.boletim_exoneracao})</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } catch (e) {
+    toast('Erro ao carregar histórico: ' + e.message, 'err');
+  }
+}
+
 // ── Teclado ────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { fecharDrawer(); fecharModalLei(); fecharModalCargo(); fecharModalOcupados(); fecharModalOcupante(); }
+  if (e.key === 'Escape') {
+    fecharDrawer();
+    fecharModalLei();
+    fecharModalCargo();
+    fecharModalOcupados();
+    fecharModalOcupante();
+    fecharModalExoneracao();
+    fecharModalHistoricoExoneracoes();
+  }
 });
 
 // ── Inicialização ──────────────────────────────────────────────────────────

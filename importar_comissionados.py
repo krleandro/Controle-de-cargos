@@ -76,6 +76,14 @@ def clean_int(val, default=1):
 con = sqlite3.connect(DB_PATH)
 con.execute("PRAGMA foreign_keys = ON")
 
+# Garante a existência da coluna 'secretaria' na tabela Cargos
+cols = [col[1] for col in con.execute("PRAGMA table_info(Cargos)").fetchall()]
+if 'secretaria' not in cols:
+    print("Adicionando coluna 'secretaria' na tabela Cargos...")
+    con.execute("ALTER TABLE Cargos ADD COLUMN secretaria TEXT;")
+    con.commit()
+
+
 # 1. Clear existing occupants
 print("Limpando tabela Ocupantes...")
 con.execute("DELETE FROM Ocupantes")
@@ -97,7 +105,16 @@ total_cargos_created = 0
 # --- Tab 1: CC ---
 print("\nProcessando aba 'CC'...")
 df_cc = xl.parse('CC', header=None)
+current_secretaria = "GABINETE DO PREFEITO"
+
 for idx, row in df_cc.iloc[2:].iterrows():
+    # Detecta cabeçalhos de seção (secretarias)
+    if pd.notna(row[0]) and pd.isna(row[1]) and pd.isna(row[2]) and pd.isna(row[3]):
+        sec_val = str(row[0]).strip()
+        if "QUADRO DE CARGOS" not in sec_val.upper():
+            current_secretaria = sec_val
+        continue
+
     nome = clean_str(row[2])
     cargo_name = clean_str(row[3])
     
@@ -125,9 +142,10 @@ for idx, row in df_cc.iloc[2:].iterrows():
             SET tipo_provimento = ?,
                 simbolo_vencimento = COALESCE(simbolo_vencimento, ?),
                 recrutamento = COALESCE(recrutamento, ?),
-                total_previstos = ?
+                total_previstos = ?,
+                secretaria = ?
             WHERE id = ?
-        """, (tipo_prov, simbolo_cargo, recrutamento_cargo, vagas_existentes, cargo_id))
+        """, (tipo_prov, simbolo_cargo, recrutamento_cargo, vagas_existentes, current_secretaria, cargo_id))
 
     else:
         # Create cargo
@@ -139,12 +157,13 @@ for idx, row in df_cc.iloc[2:].iterrows():
             
         cur = con.execute("""
             INSERT INTO Cargos
-              (nome, situacao, tipo_provimento, simbolo_vencimento, recrutamento, total_previstos, total_ocupados)
-            VALUES (?, 'Em vigor', ?, ?, ?, ?, 0)
-        """, (cargo_name, tipo_prov, simbolo_cargo, recrutamento_cargo, vagas_existentes))
+              (nome, situacao, tipo_provimento, simbolo_vencimento, recrutamento, total_previstos, total_ocupados, secretaria)
+            VALUES (?, 'Em vigor', ?, ?, ?, ?, 0, ?)
+        """, (cargo_name, tipo_prov, simbolo_cargo, recrutamento_cargo, vagas_existentes, current_secretaria))
         cargo_id = cur.lastrowid
         cargos_map[norm_cargo] = cargo_id
         total_cargos_created += 1
+
         
     # Insert occupant
     con.execute("""
@@ -185,21 +204,23 @@ for idx, row in df_ct.iloc[1:].iterrows():
             SET tipo_provimento = 'Comissão',
                 simbolo_vencimento = COALESCE(simbolo_vencimento, ?),
                 recrutamento = 'Amplo',
-                total_previstos = ?
+                total_previstos = ?,
+                secretaria = ?
             WHERE id = ?
-        """, (simbolo_cargo, vagas_existentes, cargo_id))
+        """, (simbolo_cargo, vagas_existentes, 'SECRETARIA MUNICIPAL DE PROMOÇÃO E BEM ESTAR SOCIAL', cargo_id))
 
     else:
         # Create cargo
         simbolo_cargo = normalize_symbol(simbolo_raw)
         cur = con.execute("""
             INSERT INTO Cargos
-              (nome, situacao, tipo_provimento, simbolo_vencimento, recrutamento, total_previstos, total_ocupados)
-            VALUES (?, 'Em vigor', 'Comissão', ?, 'Amplo', ?, 0)
-        """, (cargo_name, simbolo_cargo, vagas_existentes))
+              (nome, situacao, tipo_provimento, simbolo_vencimento, recrutamento, total_previstos, total_ocupados, secretaria)
+            VALUES (?, 'Em vigor', 'Comissão', ?, 'Amplo', ?, 0, ?)
+        """, (cargo_name, simbolo_cargo, vagas_existentes, 'SECRETARIA MUNICIPAL DE PROMOÇÃO E BEM ESTAR SOCIAL'))
         cargo_id = cur.lastrowid
         cargos_map[norm_cargo] = cargo_id
         total_cargos_created += 1
+
         
     # Insert occupant
     con.execute("""
@@ -240,21 +261,23 @@ for idx, row in df_de.iterrows():
             SET tipo_provimento = 'Comissão',
                 simbolo_vencimento = COALESCE(simbolo_vencimento, ?),
                 recrutamento = 'Amplo',
-                total_previstos = ?
+                total_previstos = ?,
+                secretaria = ?
             WHERE id = ?
-        """, (simbolo_cargo, vagas_existentes, cargo_id))
+        """, (simbolo_cargo, vagas_existentes, 'SECRETARIA MUNICIPAL DE EDUCAÇÃO', cargo_id))
 
     else:
         # Create cargo
         simbolo_cargo = normalize_symbol(simbolo_raw)
         cur = con.execute("""
             INSERT INTO Cargos
-              (nome, situacao, tipo_provimento, simbolo_vencimento, recrutamento, total_previstos, total_ocupados)
-            VALUES (?, 'Em vigor', 'Comissão', ?, 'Amplo', ?, 0)
-        """, (cargo_name, simbolo_cargo, vagas_existentes))
+              (nome, situacao, tipo_provimento, simbolo_vencimento, recrutamento, total_previstos, total_ocupados, secretaria)
+            VALUES (?, 'Em vigor', 'Comissão', ?, 'Amplo', ?, 0, ?)
+        """, (cargo_name, simbolo_cargo, vagas_existentes, 'SECRETARIA MUNICIPAL DE EDUCAÇÃO'))
         cargo_id = cur.lastrowid
         cargos_map[norm_cargo] = cargo_id
         total_cargos_created += 1
+
         
     # Insert occupant
     con.execute("""

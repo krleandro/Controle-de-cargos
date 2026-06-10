@@ -1214,9 +1214,12 @@
             <span id="c-ocupantes-count" style="font-size: 11px; font-weight: 700; background: var(--bg-xlightblue); color: var(--blue-primary); padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid var(--blue-light);">0 ocupantes</span>
           </div>
           <div style="display: flex; align-items: center; gap: 16px;">
+            <select id="ocupante-filtro-secretaria" onchange="carregarOcupantes()" style="padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--slate-50); outline: none; font-size: 12.5px; cursor: pointer; max-width: 220px; color: var(--text-primary);">
+              <option value="Todas">Todas as Secretarias</option>
+            </select>
             <div class="search-wrap">
               <span class="search-icon">🔍</span>
-              <input id="ocupante-search" type="text" placeholder="Buscar ocupante, matrícula ou cargo…" oninput="carregarOcupantes()" style="width: 280px; padding: 8px 12px 8px 34px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--slate-50); outline: none; font-size: 12.5px;">
+              <input id="ocupante-search" type="text" placeholder="Buscar ocupante, matrícula ou cargo…" oninput="debouncedCarregarOcupantes()" style="width: 280px; padding: 8px 12px 8px 34px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--slate-50); outline: none; font-size: 12.5px;">
             </div>
             <div class="view-toggle" title="Modo de visualização" style="display: flex;">
               <button class="view-btn active" id="c-vbtn-table" onclick="setComissionadosViewMode('table')" title="Tabela">
@@ -1463,6 +1466,7 @@
         <div class="info-item full-width"><label>Restrição/Exigência</label><span id="d-restricao">—</span></div>
         <div class="info-item full-width"><label>Fonte da CH</label><span id="d-fonte-ch">—</span></div>
         <div class="info-item full-width"><label>Fonte das atribuições</label><span id="d-fonte-atr">—</span></div>
+        <div class="info-item full-width" id="d-secretaria-item" style="display: none;"><label>Secretaria Vinculada</label><span id="d-secretaria">—</span></div>
       </div>
     </div>
 
@@ -1757,6 +1761,13 @@
       </div>
     </div>
     <div class="form-row">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Secretaria Vinculada (para Cargos de Comissão/Eletivos)</label>
+        <input class="form-control" id="nc-secretaria" list="secretaria-options" placeholder="ex: Secretaria Municipal de Saúde">
+        <datalist id="secretaria-options"></datalist>
+      </div>
+    </div>
+    <div class="form-row">
       <div class="form-group">
         <label>Total Previstos</label>
         <input class="form-control" id="nc-prev" type="number" value="0" min="0">
@@ -1878,6 +1889,8 @@ async function carregarCargos() {
     const r = await fetch('/api/cargos?' + params);
     state.cargos = await r.json();
     renderView();
+    if (typeof popularFiltroSecretarias === 'function') popularFiltroSecretarias(true);
+    if (typeof popularDatalistSecretarias === 'function') popularDatalistSecretarias(true);
   } catch(e) {
     $('tbody').innerHTML = `<tr><td colspan="10" class="empty-state" style="color:var(--danger-text)">Erro ao carregar dados.</td></tr>`;
   }
@@ -2094,6 +2107,14 @@ async function abrirDrawer(cargoId, force = false) {
     $('d-restricao').textContent    = c.restricao_exigencia || '—';
     $('d-fonte-ch').textContent     = c.fonte_carga_horaria || '—';
     $('d-fonte-atr').textContent    = c.fonte_atribuicoes || '—';
+
+    // Secretaria
+    $('d-secretaria').textContent = c.secretaria || '—';
+    if (c.tipo_provimento === 'Comissão' || c.tipo_provimento === 'Eletivo') {
+      $('d-secretaria-item').style.display = 'block';
+    } else {
+      $('d-secretaria-item').style.display = 'none';
+    }
 
     const saldo = c.saldo_vagas;
     $('d-saldo-num').textContent = saldoLabel(saldo);
@@ -2346,13 +2367,16 @@ async function submitLei() {
 function abrirModalNovoCargo() {
   state.isEditMode = false;
   $('mc-title').textContent = 'Novo Cargo';
-  ['nc-nome','nc-fopag','nc-simb','nc-esc','nc-atr','nc-recrutamento','nc-restricao','nc-fonte-ch','nc-fonte-atr'].forEach(id => $(id).value = '');
+  ['nc-nome','nc-fopag','nc-simb','nc-esc','nc-atr','nc-recrutamento','nc-restricao','nc-fonte-ch','nc-fonte-atr', 'nc-secretaria'].forEach(id => $(id).value = '');
   $('nc-situacao').value = 'Em vigor';
   $('nc-situacao-delib').value = 'não enviado';
   $('nc-tipo').value = 'Efetivo';
   $('nc-ch').value = '';
   $('nc-prev').value = 0;
   $('nc-ocup').value = 0;
+  
+  if (typeof popularDatalistSecretarias === 'function') popularDatalistSecretarias();
+  
   $('overlay-cargo').classList.add('show');
 }
 
@@ -2375,6 +2399,9 @@ function abrirModalCargoEdicao() {
   $('nc-restricao').value    = state.cargoAtivo.restricao_exigencia || '';
   $('nc-fonte-ch').value     = state.cargoAtivo.fonte_carga_horaria || '';
   $('nc-fonte-atr').value    = state.cargoAtivo.fonte_atribuicoes || '';
+  $('nc-secretaria').value   = state.cargoAtivo.secretaria || '';
+  
+  if (typeof popularDatalistSecretarias === 'function') popularDatalistSecretarias();
   
   $('overlay-cargo').classList.add('show');
 }
@@ -2400,6 +2427,7 @@ async function submitCargo() {
     restricao_exigencia: $('nc-restricao').value.trim() || null,
     fonte_carga_horaria: $('nc-fonte-ch').value.trim() || null,
     fonte_atribuicoes: $('nc-fonte-atr').value.trim() || null,
+    secretaria: $('nc-secretaria').value.trim() || null,
   };
   try {
     let url = '/api/cargos';
@@ -2940,13 +2968,76 @@ async function deletarLeiGlobal(leiId, cargoId) {
   }
 }
 
+let secretariasCache = null;
+let secretariasPromise = null;
+
+async function obterSecretarias(forcar = false) {
+  if (secretariasCache && !forcar) return secretariasCache;
+  if (secretariasPromise) return secretariasPromise;
+  
+  secretariasPromise = (async () => {
+    try {
+      const r = await fetch('/api/cargos');
+      const allCargos = await r.json();
+      const secretariasSet = new Set();
+      allCargos.forEach(c => {
+        if (c.secretaria && c.secretaria.trim()) {
+          secretariasSet.add(c.secretaria.trim());
+        }
+      });
+      secretariasCache = Array.from(secretariasSet).sort((a, b) => a.localeCompare(b));
+      return secretariasCache;
+    } catch (e) {
+      console.error('Erro ao buscar secretarias:', e);
+      return [];
+    } finally {
+      secretariasPromise = null;
+    }
+  })();
+  
+  return secretariasPromise;
+}
+
+async function popularFiltroSecretarias(forcar = false) {
+  const selectSec = $('ocupante-filtro-secretaria');
+  if (!selectSec) return;
+  const valorAnterior = selectSec.value;
+  const secretarias = await obterSecretarias(forcar);
+  
+  let html = '<option value="Todas">Todas as Secretarias</option>';
+  secretarias.forEach(sec => {
+    html += `<option value="${sec}" ${sec === valorAnterior ? 'selected' : ''}>${sec}</option>`;
+  });
+  selectSec.innerHTML = html;
+}
+
+async function popularDatalistSecretarias(forcar = false) {
+  const datalist = grandfather_datalist = $('secretaria-options');
+  if (!grandfather_datalist) return;
+  const secretarias = await obterSecretarias(forcar);
+  grandfather_datalist.innerHTML = secretarias.map(sec => `<option value="${sec}"></option>`).join('');
+}
+
+let debounceOcupantesTimer;
+function debouncedCarregarOcupantes() {
+  clearTimeout(debounceOcupantesTimer);
+  debounceOcupantesTimer = setTimeout(() => {
+    carregarOcupantes();
+  }, 280);
+}
+
 // ── Controle de Ocupantes (Cargos Comissionados) ──────────────────────────────
 let cacheCargosComissionados = [];
 
 async function carregarOcupantes() {
   const query = $('ocupante-search').value.trim();
+  const selectSec = $('ocupante-filtro-secretaria');
+  const secFilter = selectSec ? selectSec.value : 'Todas';
   try {
-    const url = `/api/ocupantes` + (query ? `?q=${encodeURIComponent(query)}` : '');
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    if (secFilter && secFilter !== 'Todas') params.set('secretaria', secFilter);
+    const url = `/api/ocupantes?` + params;
     const r = await fetch(url);
     const ocupantes = await r.json();
     

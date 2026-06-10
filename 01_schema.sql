@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS Cargos (
     -- Atribuições do cargo
     atribuicoes             TEXT,
 
+    -- Secretaria de vinculação (para cargos comissionados/eletivos)
+    secretaria              TEXT,
+
     -- Auditoria
     criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
     atualizado_em           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))

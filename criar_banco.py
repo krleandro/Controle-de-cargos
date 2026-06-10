@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS Cargos (
     restricao_exigencia TEXT,
     fonte_carga_horaria TEXT,
     fonte_atribuicoes   TEXT,
+    secretaria          TEXT,
     criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );

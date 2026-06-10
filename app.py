@@ -23,6 +23,32 @@ if not DB_PATH.exists():
 def executar_migracao():
     con = sqlite3.connect(DB_PATH)
     try:
+        # Garante a existência da coluna 'secretaria' na tabela Cargos
+        cols = [col[1] for col in con.execute("PRAGMA table_info(Cargos)").fetchall()]
+        if 'secretaria' not in cols:
+            print("[MIGRAÇÃO] Adicionando coluna 'secretaria' na tabela Cargos...")
+            con.execute("ALTER TABLE Cargos ADD COLUMN secretaria TEXT;")
+            con.commit()
+            print("[MIGRAÇÃO] Coluna 'secretaria' adicionada.")
+
+        # Recria a view vw_SaldoVagas para incluir 'secretaria'
+        con.execute("DROP VIEW IF EXISTS vw_SaldoVagas")
+        con.execute("""
+            CREATE VIEW vw_SaldoVagas AS
+            SELECT
+                id, nome, codigo_fopag, situacao, situacao_delib, tipo_provimento,
+                escolaridade, carga_horaria, simbolo_vencimento,
+                total_previstos, total_ocupados,
+                (total_previstos - total_ocupados) AS saldo_vagas,
+                CASE WHEN (total_previstos - total_ocupados) < 0 THEN 1 ELSE 0 END AS alerta_saldo_negativo,
+                atribuicoes, criado_em, atualizado_em,
+                recrutamento, restricao_exigencia, fonte_carga_horaria, fonte_atribuicoes,
+                secretaria
+            FROM Cargos;
+        """)
+        con.commit()
+        print("[MIGRAÇÃO] View 'vw_SaldoVagas' recriada.")
+
         r = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Ocupantes'").fetchone()
         if not r:
             print("[MIGRAÇÃO] Criando tabela Ocupantes e triggers...")
@@ -191,15 +217,17 @@ def criar_cargo():
             INSERT INTO Cargos
               (nome, codigo_fopag, situacao, situacao_delib, tipo_provimento, escolaridade,
                carga_horaria, simbolo_vencimento, total_previstos, total_ocupados, atribuicoes,
-               recrutamento, restricao_exigencia, fonte_carga_horaria, fonte_atribuicoes)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+               recrutamento, restricao_exigencia, fonte_carga_horaria, fonte_atribuicoes,
+               secretaria)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             dados.get("nome"), dados.get("codigo_fopag"), dados.get("situacao", "Em vigor"),
             dados.get("situacao_delib", "não enviado"), dados.get("tipo_provimento", "Efetivo"),
             dados.get("escolaridade"), dados.get("carga_horaria"), dados.get("simbolo_vencimento"),
             dados.get("total_previstos", 0), dados.get("total_ocupados", 0), dados.get("atribuicoes"),
             dados.get("recrutamento"), dados.get("restricao_exigencia"),
-            dados.get("fonte_carga_horaria"), dados.get("fonte_atribuicoes")
+            dados.get("fonte_carga_horaria"), dados.get("fonte_atribuicoes"),
+            dados.get("secretaria")
         ))
         con.commit()
         return jsonify({"id": cur.lastrowid, "mensagem": "Cargo criado com sucesso."}), 201
@@ -220,7 +248,7 @@ def atualizar_cargo(cargo_id):
               nome=?, codigo_fopag=?, situacao=?, situacao_delib=?, tipo_provimento=?, escolaridade=?,
               carga_horaria=?, simbolo_vencimento=?, total_previstos=?,
               total_ocupados=?, atribuicoes=?, recrutamento=?, restricao_exigencia=?,
-              fonte_carga_horaria=?, fonte_atribuicoes=?
+              fonte_carga_horaria=?, fonte_atribuicoes=?, secretaria=?
             WHERE id=?
         """, (
             dados.get("nome"), dados.get("codigo_fopag"), dados.get("situacao"),
@@ -228,7 +256,8 @@ def atualizar_cargo(cargo_id):
             dados.get("escolaridade"), dados.get("carga_horaria"), dados.get("simbolo_vencimento"),
             dados.get("total_previstos"), dados.get("total_ocupados"), dados.get("atribuicoes"),
             dados.get("recrutamento"), dados.get("restricao_exigencia"),
-            dados.get("fonte_carga_horaria"), dados.get("fonte_atribuicoes"), cargo_id
+            dados.get("fonte_carga_horaria"), dados.get("fonte_atribuicoes"),
+            dados.get("secretaria"), cargo_id
         ))
         con.commit()
         return jsonify({"mensagem": "Cargo atualizado."})
@@ -653,17 +682,21 @@ def fazer_backup():
 def listar_ocupantes():
     """Lista todos os ocupantes cadastrados com informações do cargo."""
     q = request.args.get("q")
+    secretaria = request.args.get("secretaria")
     
     sql = """
-        SELECT o.*, c.nome AS cargo_nome, c.codigo_fopag AS cargo_codigo_fopag, c.simbolo_vencimento AS cargo_simbolo_vencimento
+        SELECT o.*, c.nome AS cargo_nome, c.codigo_fopag AS cargo_codigo_fopag, c.simbolo_vencimento AS cargo_simbolo_vencimento, c.secretaria AS cargo_secretaria
         FROM Ocupantes o
         JOIN Cargos c ON o.cargo_id = c.id
         WHERE 1=1
     """
     params = []
     if q:
-        sql += " AND (o.nome LIKE ? OR o.matricula LIKE ? OR c.nome LIKE ?)"
-        params += [f"%{q}%", f"%{q}%", f"%{q}%"]
+        sql += " AND (o.nome LIKE ? OR o.matricula LIKE ? OR o.portaria LIKE ? OR c.nome LIKE ?)"
+        params += [f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"]
+    if secretaria:
+        sql += " AND c.secretaria = ?"
+        params.append(secretaria)
     
     sql += " ORDER BY o.nome COLLATE NOCASE"
     

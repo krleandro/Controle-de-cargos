@@ -683,7 +683,7 @@ class RelatorioCargoPDF(FPDF):
     # MONTAGEM DO RELATÓRIO (página de conteúdo)
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def _pagina_conteudo(self, cargo: Dict[str, Any], leis: List[Dict[str, Any]], fontes: List[Dict[str, Any]]):
+    def _pagina_conteudo(self, cargo: Dict[str, Any], leis: List[Dict[str, Any]], fontes: List[Dict[str, Any]], ocupantes: List[Dict[str, Any]] = None):
         """Monta as páginas de conteúdo após a capa."""
         self.add_page()
         self.set_y(self.t_margin)
@@ -758,18 +758,66 @@ class RelatorioCargoPDF(FPDF):
                 self._info_row(f.get("tipo", "Fonte"), det, alt=idx % 2 == 0)
             self._info_panel_end()
 
+        # ── Seção de Ocupantes (apenas para cargos comissionados com ocupantes) ──
+        if ocupantes:
+            self._section_title("Ocupantes Cadastrados")
+            self._ocupantes_table(ocupantes)
+
         # ── Seção 5: Histórico Legislativo ──
         self._section_title("Histórico Legislativo")
         self._leis_table(leis)
+
+    def _ocupantes_table(self, ocupantes: List[Dict[str, Any]]):
+        """Tabela de ocupantes do cargo comissionado."""
+        self.ln(1)
+        heading_face = FontFace(
+            emphasis="B",
+            color=BRANCO,
+            fill_color=AZUL_INST,
+        )
+        col_widths = (55, 20, 15, 25, 25, 30)
+        self._set_font("", 8)
+        with self.table(
+            col_widths=col_widths,
+            text_align=("LEFT", "CENTER", "CENTER", "CENTER", "CENTER", "CENTER"),
+            v_align="MIDDLE",
+            line_height=5.8,
+            headings_style=heading_face,
+            borders_layout=TableBordersLayout.ALL,
+        ) as table:
+            table.row(["Nome do Ocupante", "Matrícula", "Símbolo", "Portaria", "B. Oficial", "Data Nomeação"])
+            for i, o in enumerate(ocupantes):
+                nome = o.get("nome", "—")
+                matricula = o.get("matricula", "—")
+                simb = o.get("simbolo_vencimento") or "—"
+                portaria = o.get("portaria") or "—"
+                bo = o.get("boletim_oficial") or "—"
+                data_nom = o.get("data_nomeacao") or "—"
+                if data_nom and len(data_nom) == 10 and data_nom[4] == '-' and data_nom[7] == '-':
+                    try:
+                        dt = datetime.strptime(data_nom, "%Y-%m-%d")
+                        data_nom = dt.strftime("%d/%m/%Y")
+                    except:
+                        pass
+                bg = CINZA_50 if i % 2 == 0 else BRANCO
+                data_face = FontFace(fill_color=bg)
+                row = table.row()
+                row.cell(nome, style=data_face)
+                row.cell(matricula, style=data_face)
+                row.cell(simb, style=data_face)
+                row.cell(portaria, style=data_face)
+                row.cell(bo, style=data_face)
+                row.cell(data_nom, style=data_face)
+        self.ln(2)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # ENTRADA PÚBLICA
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def montar(self, cargo: Dict[str, Any], leis: List[Dict[str, Any]], fontes: List[Dict[str, Any]]):
+    def montar(self, cargo: Dict[str, Any], leis: List[Dict[str, Any]], fontes: List[Dict[str, Any]], ocupantes: List[Dict[str, Any]] = None):
         """Gera a capa e as páginas de conteúdo."""
         self._capa(cargo)
-        self._pagina_conteudo(cargo, leis, fontes)
+        self._pagina_conteudo(cargo, leis, fontes, ocupantes or [])
 
         # Metadados do documento
         nome_cargo = cargo.get("nome", "Cargo")
@@ -780,10 +828,10 @@ class RelatorioCargoPDF(FPDF):
         self.set_keywords("FOPAG cargo vaga quadro pessoal Miracema")
 
 
-def gerar_relatorio(cargo: dict, leis: list, fontes: list) -> bytes:
+def gerar_relatorio(cargo: dict, leis: list, fontes: list, ocupantes: list = None) -> bytes:
     """Gera o PDF e retorna os bytes prontos para download."""
     pdf = RelatorioCargoPDF()
-    pdf.montar(cargo, leis, fontes)
+    pdf.montar(cargo, leis, fontes, ocupantes)
     return bytes(pdf.output(dest="S"))
 
 

@@ -19,6 +19,69 @@ if not DB_PATH.exists():
         "Ou use o iniciar.bat que faz isso automaticamente."
     )
 
+# ── Migração: Criar tabela Ocupantes e triggers se não existirem ──────────────
+def executar_migracao():
+    con = sqlite3.connect(DB_PATH)
+    try:
+        r = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Ocupantes'").fetchone()
+        if not r:
+            print("[MIGRAÇÃO] Criando tabela Ocupantes e triggers...")
+            con.executescript("""
+                CREATE TABLE IF NOT EXISTS Ocupantes (
+                    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cargo_id                INTEGER NOT NULL REFERENCES Cargos (id) ON DELETE CASCADE,
+                    nome                    TEXT    NOT NULL,
+                    matricula               TEXT    NOT NULL,
+                    tipo_recrutamento       TEXT    CHECK (tipo_recrutamento IN ('Amplo', 'Limitado', 'Outro', NULL)),
+                    simbolo_vencimento      TEXT    CHECK (simbolo_vencimento IN ('SS', 'SP', 'CC1', 'CC2', 'CC3', 'CC4', 'CC5', 'CC6', 'FGDE 1', 'FGDE 2', 'FGDE 3', 'FGDE 4', 'FGDE 5', 'FGDE 6', NULL)),
+                    portaria                TEXT,
+                    boletim_oficial         TEXT,
+                    data_nomeacao           TEXT,    -- YYYY-MM-DD
+                    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+                    atualizado_em           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_ocupantes_cargo_id ON Ocupantes (cargo_id);
+                
+                CREATE TRIGGER IF NOT EXISTS trg_ocupantes_insert AFTER INSERT ON Ocupantes
+                BEGIN
+                    UPDATE Cargos
+                    SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = NEW.cargo_id)
+                    WHERE id = NEW.cargo_id;
+                END;
+
+                CREATE TRIGGER IF NOT EXISTS trg_ocupantes_delete AFTER DELETE ON Ocupantes
+                BEGIN
+                    UPDATE Cargos
+                    SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = OLD.cargo_id)
+                    WHERE id = OLD.cargo_id;
+                END;
+
+                CREATE TRIGGER IF NOT EXISTS trg_ocupantes_update AFTER UPDATE ON Ocupantes
+                BEGIN
+                    UPDATE Cargos
+                    SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = NEW.cargo_id)
+                    WHERE id = NEW.cargo_id;
+                    UPDATE Cargos
+                    SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = OLD.cargo_id)
+                    WHERE id = OLD.cargo_id;
+                END;
+
+                -- Inicializa total_ocupados para 0 em todos os cargos comissionados, 
+                -- já que a tabela Ocupantes está começando vazia.
+                UPDATE Cargos
+                SET total_ocupados = 0
+                WHERE tipo_provimento IN ('Comissão', 'Comissao');
+            """)
+            con.commit()
+            print("[MIGRAÇÃO] Tabela Ocupantes e triggers criadas com sucesso.")
+    except Exception as e:
+        print(f"[ERRO MIGRAÇÃO] Falha ao rodar migrações: {e}")
+    finally:
+        con.close()
+
+executar_migracao()
+
 # ── App ────────────────────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder="static", template_folder="static")
 
@@ -87,7 +150,7 @@ def listar_cargos():
 
 @app.route("/api/cargos/<int:cargo_id>", methods=["GET"])
 def get_cargo(cargo_id):
-    """Retorna um cargo com suas leis e fontes de carga horária."""
+    """Retorna um cargo com suas leis, fontes e ocupantes."""
     con = get_db_connection()
     try:
         cargo = con.execute("SELECT * FROM vw_SaldoVagas WHERE id = ?", (cargo_id,)).fetchone()
@@ -104,10 +167,16 @@ def get_cargo(cargo_id):
             (cargo_id,)
         ).fetchall()
 
+        ocupantes = con.execute(
+            "SELECT * FROM Ocupantes WHERE cargo_id = ? ORDER BY nome",
+            (cargo_id,)
+        ).fetchall()
+
         return jsonify({
             "cargo":  dict(cargo),
             "leis":   [dict(l) for l in leis],
             "fontes": [dict(f) for f in fontes],
+            "ocupantes": [dict(o) for o in ocupantes],
         })
     finally:
         con.close()
@@ -369,12 +438,14 @@ def baixar_relatorio(cargo_id):
         ).fetchall()
 
         fontes = con.execute("SELECT * FROM FontesCargaHoraria WHERE cargo_id = ?", (cargo_id,)).fetchall()
+        
+        ocupantes = con.execute("SELECT * FROM Ocupantes WHERE cargo_id = ? ORDER BY nome", (cargo_id,)).fetchall()
     finally:
         con.close()
 
     import io
     try:
-        pdf_bytes = gerar_relatorio(dict(cargo), [dict(l) for l in leis], [dict(f) for f in fontes])
+        pdf_bytes = gerar_relatorio(dict(cargo), [dict(l) for l in leis], [dict(f) for f in fontes], [dict(o) for o in ocupantes])
     except Exception as e:
         abort(500, description=f"Erro ao gerar PDF: {e}")
 
@@ -574,6 +645,156 @@ def fazer_backup():
         as_attachment=True,
         download_name=backup_filename
     )
+
+
+# ── Rotas de Ocupantes ─────────────────────────────────────────────────────────
+
+@app.route("/api/ocupantes", methods=["GET"])
+def listar_ocupantes():
+    """Lista todos os ocupantes cadastrados com informações do cargo."""
+    q = request.args.get("q")
+    
+    sql = """
+        SELECT o.*, c.nome AS cargo_nome, c.codigo_fopag AS cargo_codigo_fopag, c.simbolo_vencimento AS cargo_simbolo_vencimento
+        FROM Ocupantes o
+        JOIN Cargos c ON o.cargo_id = c.id
+        WHERE 1=1
+    """
+    params = []
+    if q:
+        sql += " AND (o.nome LIKE ? OR o.matricula LIKE ? OR c.nome LIKE ?)"
+        params += [f"%{q}%", f"%{q}%", f"%{q}%"]
+    
+    sql += " ORDER BY o.nome COLLATE NOCASE"
+    
+    con = get_db_connection()
+    try:
+        rows = con.execute(sql, params).fetchall()
+        return jsonify([dict(r) for r in rows])
+    finally:
+        con.close()
+
+@app.route("/api/ocupantes/<int:ocupante_id>", methods=["GET"])
+def get_ocupante(ocupante_id):
+    """Retorna detalhes de um ocupante."""
+    con = get_db_connection()
+    try:
+        ocupante = con.execute("""
+            SELECT o.*, c.nome AS cargo_nome, c.codigo_fopag AS cargo_codigo_fopag
+            FROM Ocupantes o
+            JOIN Cargos c ON o.cargo_id = c.id
+            WHERE o.id = ?
+        """, (ocupante_id,)).fetchone()
+        if not ocupante:
+            abort(404, description="Ocupante não encontrado")
+        return jsonify(dict(ocupante))
+    finally:
+        con.close()
+
+@app.route("/api/ocupantes", methods=["POST"])
+def criar_ocupante():
+    """Cadastra um novo ocupante."""
+    dados = request.get_json()
+    cargo_id = dados.get("cargo_id")
+    nome = dados.get("nome")
+    matricula = dados.get("matricula")
+    
+    if not cargo_id or not nome or not matricula:
+        abort(400, description="cargo_id, nome e matricula são obrigatórios.")
+        
+    con = get_db_connection()
+    try:
+        # Valida se o cargo é comissionado
+        cargo = con.execute("SELECT tipo_provimento FROM Cargos WHERE id = ?", (cargo_id,)).fetchone()
+        if not cargo:
+            abort(404, description="Cargo não encontrado")
+        if cargo["tipo_provimento"] not in ("Comissão", "Comissao"):
+            abort(400, description="Ocupantes só podem ser cadastrados para cargos comissionados.")
+            
+        cur = con.execute("""
+            INSERT INTO Ocupantes
+              (cargo_id, nome, matricula, tipo_recrutamento, simbolo_vencimento,
+               portaria, boletim_oficial, data_nomeacao)
+            VALUES (?,?,?,?,?,?,?,?)
+        """, (
+            cargo_id, nome, matricula, dados.get("tipo_recrutamento"),
+            dados.get("simbolo_vencimento"), dados.get("portaria"),
+            dados.get("boletim_oficial"), dados.get("data_nomeacao")
+        ))
+        con.commit()
+        return jsonify({"id": cur.lastrowid, "mensagem": "Ocupante cadastrado com sucesso."}), 201
+    finally:
+        con.close()
+
+@app.route("/api/ocupantes/<int:ocupante_id>", methods=["PUT"])
+def atualizar_ocupante(ocupante_id):
+    """Atualiza dados do ocupante."""
+    dados = request.get_json()
+    cargo_id = dados.get("cargo_id")
+    nome = dados.get("nome")
+    matricula = dados.get("matricula")
+    
+    if not cargo_id or not nome or not matricula:
+        abort(400, description="cargo_id, nome e matricula são obrigatórios.")
+        
+    con = get_db_connection()
+    try:
+        ocupante = con.execute("SELECT id FROM Ocupantes WHERE id = ?", (ocupante_id,)).fetchone()
+        if not ocupante:
+            abort(404, description="Ocupante não encontrado")
+            
+        cargo = con.execute("SELECT tipo_provimento FROM Cargos WHERE id = ?", (cargo_id,)).fetchone()
+        if not cargo:
+            abort(404, description="Cargo não encontrado")
+        if cargo["tipo_provimento"] not in ("Comissão", "Comissao"):
+            abort(400, description="Ocupantes só podem ser cadastrados para cargos comissionados.")
+            
+        con.execute("""
+            UPDATE Ocupantes SET
+              cargo_id=?, nome=?, matricula=?, tipo_recrutamento=?,
+              simbolo_vencimento=?, portaria=?, boletim_oficial=?, data_nomeacao=?,
+              atualizado_em=datetime('now','localtime')
+            WHERE id=?
+        """, (
+            cargo_id, nome, matricula, dados.get("tipo_recrutamento"),
+            dados.get("simbolo_vencimento"), dados.get("portaria"),
+            dados.get("boletim_oficial"), dados.get("data_nomeacao"),
+            ocupante_id
+        ))
+        con.commit()
+        return jsonify({"mensagem": "Ocupante atualizado com sucesso."})
+    finally:
+        con.close()
+
+@app.route("/api/ocupantes/<int:ocupante_id>", methods=["DELETE"])
+def deletar_ocupante(ocupante_id):
+    """Exonera (remove) um ocupante."""
+    con = get_db_connection()
+    try:
+        ocupante = con.execute("SELECT id, cargo_id FROM Ocupantes WHERE id = ?", (ocupante_id,)).fetchone()
+        if not ocupante:
+            abort(404, description="Ocupante não encontrado")
+            
+        con.execute("DELETE FROM Ocupantes WHERE id = ?", (ocupante_id,))
+        con.commit()
+        return jsonify({"mensagem": "Ocupante exonerado/excluído com sucesso."})
+    finally:
+        con.close()
+
+@app.route("/api/cargos/<int:cargo_id>/ocupantes", methods=["GET"])
+def listar_ocupantes_cargo(cargo_id):
+    """Lista ocupantes de um cargo específico."""
+    con = get_db_connection()
+    try:
+        rows = con.execute("""
+            SELECT * FROM Ocupantes
+            WHERE cargo_id = ?
+            ORDER BY nome COLLATE NOCASE
+        """, (cargo_id,)).fetchall()
+        return jsonify([dict(r) for r in rows])
+    finally:
+        con.close()
+
 
 @app.route("/")
 def index():

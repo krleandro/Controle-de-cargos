@@ -260,3 +260,51 @@ INSERT OR IGNORE INTO Dominios (categoria, valor) VALUES
     ('fonte_ch_tipo',   'Edital'),
     ('fonte_ch_tipo',   'Decreto'),
     ('fonte_ch_tipo',   'Outro');
+
+
+-- =============================================================================
+-- BLOCO 8 — TABELA RELACIONAL: Ocupantes (Cargos Comissionados)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS Ocupantes (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    cargo_id                INTEGER NOT NULL REFERENCES Cargos (id) ON DELETE CASCADE,
+    nome                    TEXT    NOT NULL,
+    matricula               TEXT    NOT NULL,
+    tipo_recrutamento       TEXT    CHECK (tipo_recrutamento IN ('Amplo', 'Limitado', 'Outro', NULL)),
+    simbolo_vencimento      TEXT    CHECK (simbolo_vencimento IN ('SS', 'SP', 'CC1', 'CC2', 'CC3', 'CC4', 'CC5', 'CC6', 'FGDE 1', 'FGDE 2', 'FGDE 3', 'FGDE 4', 'FGDE 5', 'FGDE 6', NULL)),
+    portaria                TEXT,
+    boletim_oficial         TEXT,
+    data_nomeacao           TEXT,    -- YYYY-MM-DD
+    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+    atualizado_em           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ocupantes_cargo_id ON Ocupantes (cargo_id);
+
+-- Triggers para atualizar Cargos.total_ocupados automaticamente
+
+CREATE TRIGGER IF NOT EXISTS trg_ocupantes_insert AFTER INSERT ON Ocupantes
+BEGIN
+    UPDATE Cargos
+    SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = NEW.cargo_id)
+    WHERE id = NEW.cargo_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ocupantes_delete AFTER DELETE ON Ocupantes
+BEGIN
+    UPDATE Cargos
+    SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = OLD.cargo_id)
+    WHERE id = OLD.cargo_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ocupantes_update AFTER UPDATE ON Ocupantes
+BEGIN
+    UPDATE Cargos
+    SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = NEW.cargo_id)
+    WHERE id = NEW.cargo_id;
+    UPDATE Cargos
+    SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = OLD.cargo_id)
+    WHERE id = OLD.cargo_id;
+END;
+

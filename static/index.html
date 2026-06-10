@@ -1020,6 +1020,9 @@
     <button class="nav-item" onclick="setView('alertas',this)">
       <span>⚠</span> Alertas
     </button>
+    <button class="nav-item" onclick="setView('comissionados',this)">
+      <span>👥</span> Controle de Comissionados
+    </button>
     <button class="nav-item" onclick="setView('relatorios',this)">
       <span>📊</span> Relatórios Gerenciais
     </button>
@@ -1046,8 +1049,11 @@
         <span class="search-icon">🔍</span>
         <input id="search" type="text" placeholder="Buscar cargo ou código FOPAG…" oninput="debouncedFetch()">
       </div>
-      <button class="btn-primary" onclick="abrirModalNovoCargo()">
+      <button class="btn-primary" id="btn-header-novo-cargo" onclick="abrirModalNovoCargo()">
         <span style="font-size:16px;line-height:1">+</span> Novo Cargo
+      </button>
+      <button class="btn-primary" id="btn-header-novo-ocupante" onclick="abrirModalNovoOcupante()" style="display:none">
+        <span style="font-size:16px;line-height:1">+</span> Novo Ocupante
       </button>
     </div>
   </header>
@@ -1162,6 +1168,79 @@
       <div class="compact-foot">
         <span id="compact-count">—</span>
         <span>FOPAG · Prefeitura de Miracema</span>
+      </div>
+    </div>
+
+    <!-- Controle de Comissionados -->
+    <div id="comissionados-wrap" style="display: none; margin: 24px 32px 0; animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);">
+      
+      <!-- KPIs Específicas de Comissão -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 25px;">
+        <div class="kpi-card" style="background: var(--bg-card); border: 1px solid var(--border); padding: 20px; border-radius: var(--radius-lg); position: relative; overflow: hidden; box-shadow: var(--shadow-sm);">
+          <div style="position: absolute; left: 0; top: 0; width: 4px; height: 100%; background: var(--blue-primary);"></div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Cargos de Comissão</div>
+          <div id="c-kpi-total-cargos" style="font-size: 28px; font-weight: 700; color: var(--text-primary); margin: 8px 0 4px;">—</div>
+          <div style="font-size: 11px; color: var(--text-muted);">tipos de cargo mapeados</div>
+        </div>
+
+        <div class="kpi-card" style="background: var(--bg-card); border: 1px solid var(--border); padding: 20px; border-radius: var(--radius-lg); position: relative; overflow: hidden; box-shadow: var(--shadow-sm);">
+          <div style="position: absolute; left: 0; top: 0; width: 4px; height: 100%; background: var(--blue-medium);"></div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Vagas Previstas</div>
+          <div id="c-kpi-previstas" style="font-size: 28px; font-weight: 700; color: var(--text-primary); margin: 8px 0 4px;">—</div>
+          <div style="font-size: 11px; color: var(--text-muted);">vagas em lei de comissão</div>
+        </div>
+
+        <div class="kpi-card" style="background: var(--bg-card); border: 1px solid var(--border); padding: 20px; border-radius: var(--radius-lg); position: relative; overflow: hidden; box-shadow: var(--shadow-sm);">
+          <div style="position: absolute; left: 0; top: 0; width: 4px; height: 100%; background: var(--success);"></div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Vagas Ocupadas</div>
+          <div id="c-kpi-ocupadas" style="font-size: 28px; font-weight: 700; color: var(--text-primary); margin: 8px 0 4px;">—</div>
+          <div id="c-kpi-ocupadas-percent" style="font-size: 11px; color: var(--success-text); font-weight: 500;">—</div>
+        </div>
+
+        <div class="kpi-card" style="background: var(--bg-card); border: 1px solid var(--border); padding: 20px; border-radius: var(--radius-lg); position: relative; overflow: hidden; box-shadow: var(--shadow-sm);">
+          <div id="c-kpi-saldo-bar" style="position: absolute; left: 0; top: 0; width: 4px; height: 100%; background: var(--warning);"></div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Saldo Disponível</div>
+          <div id="c-kpi-saldo" style="font-size: 28px; font-weight: 700; color: var(--text-primary); margin: 8px 0 4px;">—</div>
+          <div id="c-kpi-saldo-percent" style="font-size: 11px; color: var(--warning-text); font-weight: 500;">—</div>
+        </div>
+      </div>
+
+      <!-- Tabela de Ocupantes -->
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden;">
+        <div style="padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
+            <span style="font-size: 18px;">👥</span>
+            <h3 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0;">Relação de Ocupantes de Cargos Comissionados</h3>
+            <span id="c-ocupantes-count" style="font-size: 11px; font-weight: 700; background: var(--bg-xlightblue); color: var(--blue-primary); padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid var(--blue-light);">0 ocupantes</span>
+          </div>
+          <div class="search-wrap" style="margin-left: auto;">
+            <span class="search-icon">🔍</span>
+            <input id="ocupante-search" type="text" placeholder="Buscar ocupante, matrícula ou cargo…" oninput="carregarOcupantes()" style="width: 280px; padding: 8px 12px 8px 34px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--slate-50); outline: none; font-size: 12.5px;">
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: var(--slate-50); border-bottom: 1px solid var(--border);">
+                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Matrícula</th>
+                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Nome do Ocupante</th>
+                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Cargo Comissionado</th>
+                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center;">Símbolo</th>
+                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center;">Recrutamento</th>
+                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: left;">Portaria / B.O.</th>
+                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center;">Data Nomeação</th>
+                <th style="padding: 12px 16px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: right;" class="no-sort">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="c-ocupantes-tbody">
+              <tr><td colspan="8" class="empty-state">Nenhum ocupante cadastrado.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <span id="c-ocupantes-footer-lbl">Listagem de nomeados FOPAG</span>
+          <span>Prefeitura Municipal de Miracema</span>
+        </div>
       </div>
     </div>
 
@@ -1343,6 +1422,17 @@
       </div>
     </div>
 
+    <!-- Ocupantes do Cargo -->
+    <div class="drawer-section" id="d-ocupantes-section" style="display: none;">
+      <div class="drawer-section-title" style="display:flex;align-items:center;justify-content:space-between">
+        Ocupantes do Cargo
+        <button class="btn-outline" style="font-size:11px;padding:3px 10px" id="d-btn-add-ocupante" onclick="abrirModalNovoOcupanteDireto()">+ Nomear Ocupante</button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;" id="d-ocupantes-list">
+        <div style="font-size:12px;color:var(--text-muted)">Nenhum ocupante cadastrado.</div>
+      </div>
+    </div>
+
     <!-- Histórico de leis -->
     <div class="drawer-section">
       <div class="drawer-section-title" style="display:flex;align-items:center;justify-content:space-between">
@@ -1358,7 +1448,7 @@
   <div class="drawer-footer">
     <button class="btn-outline" onclick="abrirModalCargoEdicao()">✏ Editar Cargo</button>
     <button class="btn-outline" onclick="gerarRelatorioPDF()" style="margin-left:auto">📄 Gerar Relatório</button>
-    <button class="btn-ghost" onclick="abrirModalOcupados()">✏ Ocupados</button>
+    <button class="btn-ghost" id="d-btn-editar-ocupados" onclick="abrirModalOcupados()">✏ Ocupados</button>
   </div>
 </div>
 
@@ -1453,6 +1543,84 @@
     <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:18px;">
       <button class="btn-ghost" onclick="fecharModalFiltroRelatorio()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:1px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;">Cancelar</button>
       <button class="btn-primary" onclick="confirmarBaixarRelatorioConsolidado()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:none; background:linear-gradient(135deg, var(--blue-primary), #3b82f6); color:#fff; cursor:pointer; box-shadow:var(--shadow-md);">Gerar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: NOVO / EDITAR OCUPANTE ──────────────────────────────────────────────── -->
+<div class="overlay" id="overlay-ocupante" onclick="if(event.target===this)fecharModalOcupante()">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <div><h2 id="mo-title-ocupante">Novo Ocupante</h2><p style="color:var(--text-secondary);font-size:12px">Preencha os dados do ocupante do cargo comissionado</p></div>
+      <button class="close-btn" onclick="fecharModalOcupante()">×</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Nome do Ocupante *</label>
+        <input class="form-control" id="no-nome" placeholder="ex: João da Silva">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Matrícula *</label>
+        <input class="form-control" id="no-matricula" placeholder="ex: 12345">
+      </div>
+      <div class="form-group">
+        <label>Cargo Comissionado *</label>
+        <select class="form-control" id="no-cargo" onchange="aoSelecionarCargoOcupante()">
+          <option value="">Selecione...</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Símbolo de Vencimento</label>
+        <select class="form-control" id="no-simbolo">
+          <option value="">Selecione...</option>
+          <option value="SS">SS</option>
+          <option value="SP">SP</option>
+          <option value="CC1">CC1</option>
+          <option value="CC2">CC2</option>
+          <option value="CC3">CC3</option>
+          <option value="CC4">CC4</option>
+          <option value="CC5">CC5</option>
+          <option value="CC6">CC6</option>
+          <option value="FGDE 1">FGDE 1</option>
+          <option value="FGDE 2">FGDE 2</option>
+          <option value="FGDE 3">FGDE 3</option>
+          <option value="FGDE 4">FGDE 4</option>
+          <option value="FGDE 5">FGDE 5</option>
+          <option value="FGDE 6">FGDE 6</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Tipo de Recrutamento</label>
+        <select class="form-control" id="no-recrutamento">
+          <option value="">Selecione...</option>
+          <option value="Amplo">Amplo</option>
+          <option value="Limitado">Limitado</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Portaria de Nomeação</label>
+        <input class="form-control" id="no-portaria" placeholder="ex: Portaria nº 456/2026">
+      </div>
+      <div class="form-group">
+        <label>Boletim Oficial</label>
+        <input class="form-control" id="no-boletim" placeholder="ex: BO nº 345">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="grid-column: 1 / -1">
+        <label>Data de Nomeação</label>
+        <input class="form-control" id="no-data-nomeacao" type="date">
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:18px; margin-top: 18px;">
+      <button class="btn-ghost" onclick="fecharModalOcupante()">Cancelar</button>
+      <button class="btn-primary" onclick="submitOcupante()">Salvar Ocupante</button>
     </div>
   </div>
 </div>
@@ -1962,6 +2130,43 @@ async function abrirDrawer(cargoId, force = false) {
       }).join('');
     }
 
+    // Ocupantes (Drawer)
+    const ocupantesSection = $('d-ocupantes-section');
+    const ocupantesList = $('d-ocupantes-list');
+    const btnEditarOcupados = $('d-btn-editar-ocupados');
+
+    if (c.tipo_provimento === 'Comissão' || c.tipo_provimento === 'Comissao') {
+      ocupantesSection.style.display = 'block';
+      btnEditarOcupados.style.display = 'none';
+
+      if (!d.ocupantes || d.ocupantes.length === 0) {
+        ocupantesList.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:8px 2px">Nenhum ocupante cadastrado.</div>`;
+      } else {
+        ocupantesList.innerHTML = d.ocupantes.map(o => {
+          const dataNom = o.data_nomeacao ? o.data_nomeacao.split('-').reverse().join('/') : '—';
+          return `
+            <div style="background:#ffffff; border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; display:flex; flex-direction:column; gap:4px; box-shadow:var(--shadow-xs);">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:600; color:var(--text-primary); font-size:13px;">${o.nome}</span>
+                <span class="td-code" style="font-size:10.5px; padding:1px 4px;">Mat. ${o.matricula}</span>
+              </div>
+              <div style="font-size:11.5px; color:var(--text-secondary); display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                <span>Portaria: ${o.portaria || '—'} (B.O: ${o.boletim_oficial || '—'})</span>
+                <span>Nomeação: ${dataNom}</span>
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--border); padding-top:6px; margin-top:4px;">
+                <button class="timeline-btn" style="padding:2px 6px; font-size:10.5px;" onclick="event.stopPropagation(); abrirModalOcupanteEdicao(${o.id})" title="Editar Ocupante">✏️ Editar</button>
+                <button class="timeline-btn" style="padding:2px 6px; font-size:10.5px; color:var(--danger-text);" onclick="event.stopPropagation(); exonerarOcupante(${o.id})" title="Exonerar Ocupante">Exonerar</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    } else {
+      ocupantesSection.style.display = 'none';
+      btnEditarOcupados.style.display = 'inline-flex';
+    }
+
     $('drawer').classList.add('open');
     renderView();
   } catch(e) { toast('Erro ao carregar cargo.', 'err'); }
@@ -2268,6 +2473,7 @@ function setView(v, btn) {
   // Oculta todos os painéis customizados por padrão
   $('relatorios-wrap').style.display = 'none';
   $('leis-historico-wrap').style.display = 'none';
+  $('comissionados-wrap').style.display = 'none';
   
   if (v === 'relatorios') {
     $('stats-bar').style.display = 'none';
@@ -2291,10 +2497,25 @@ function setView(v, btn) {
     document.querySelector('#header p').textContent = 'Linha do tempo interativa e controle da movimentação legislativa';
     $('leis-historico-wrap').style.display = 'block';
     carregarHistoricoLeisGlobal();
+  } else if (v === 'comissionados') {
+    $('stats-bar').style.display = 'none';
+    $('toolbar').style.display = 'none';
+    $('table-wrap').style.display = 'none';
+    $('cards-wrap').classList.remove('visible');
+    $('compact-wrap').classList.remove('visible');
+    document.querySelector('#header .header-actions').style.display = 'flex';
+    $('btn-header-novo-cargo').style.display = 'none';
+    $('btn-header-novo-ocupante').style.display = 'inline-flex';
+    document.querySelector('#header h1').textContent = 'Controle de Cargos Comissionados';
+    document.querySelector('#header p').textContent = 'Gestão de ocupantes, nomeações, portarias e símbolos de vencimento';
+    $('comissionados-wrap').style.display = 'block';
+    carregarOcupantes();
   } else {
     $('stats-bar').style.display = 'grid';
     $('toolbar').style.display = 'flex';
     document.querySelector('#header .header-actions').style.display = 'flex';
+    $('btn-header-novo-cargo').style.display = 'inline-flex';
+    $('btn-header-novo-ocupante').style.display = 'none';
     document.querySelector('#header h1').textContent = 'Quadro de Pessoal';
     document.querySelector('#header p').textContent = 'Cargos efetivos e comissionados · Prefeitura de Miracema';
     setViewMode(state.viewMode);
@@ -2673,9 +2894,293 @@ async function deletarLeiGlobal(leiId, cargoId) {
   }
 }
 
+// ── Controle de Ocupantes (Cargos Comissionados) ──────────────────────────────
+let cacheCargosComissionados = [];
+
+async function carregarOcupantes() {
+  const query = $('ocupante-search').value.trim();
+  try {
+    const url = `/api/ocupantes` + (query ? `?q=${encodeURIComponent(query)}` : '');
+    const r = await fetch(url);
+    const ocupantes = await r.json();
+    
+    const tbody = $('c-ocupantes-tbody');
+    $('c-ocupantes-count').textContent = `${ocupantes.length} ocupante${ocupantes.length !== 1 ? 's' : ''}`;
+    
+    if (ocupantes.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Nenhum ocupante encontrado.</td></tr>`;
+    } else {
+      tbody.innerHTML = ocupantes.map(o => {
+        const dataNom = o.data_nomeacao ? o.data_nomeacao.split('-').reverse().join('/') : '—';
+        return `
+          <tr class="data-row" onclick="abrirDrawer(${o.cargo_id}, true)">
+            <td style="padding: 12px 16px; font-weight:600; color:var(--text-secondary); font-family:monospace;">${o.matricula}</td>
+            <td style="padding: 12px 16px; font-weight:700; color:var(--text-primary);">${o.nome}</td>
+            <td style="padding: 12px 16px; font-weight:600; color:var(--blue-primary); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${o.cargo_nome} ${o.cargo_codigo_fopag ? `<span class="td-code" style="font-size:10px; margin-left:4px;">Cód. ${o.cargo_codigo_fopag}</span>` : ''}
+            </td>
+            <td style="padding: 12px 16px; text-align:center; font-weight:600;">${o.simbolo_vencimento || '—'}</td>
+            <td style="padding: 12px 16px; text-align:center;">
+              <span class="badge ${o.tipo_recrutamento === 'Amplo' ? 'badge-delib-salvo' : o.tipo_recrutamento === 'Limitado' ? 'badge-delib-env' : 'badge-delib-nao'}">
+                ${o.tipo_recrutamento || '—'}
+              </span>
+            </td>
+            <td style="padding: 12px 16px; color:var(--text-secondary);">${o.portaria || '—'} ${o.boletim_oficial ? `<span style="font-size:11px; color:var(--text-muted);">(${o.boletim_oficial})</span>` : ''}</td>
+            <td style="padding: 12px 16px; text-align:center; font-weight:500;">${dataNom}</td>
+            <td style="padding: 12px 16px; text-align:right;" onclick="event.stopPropagation()">
+              <button class="action-btn" onclick="abrirModalOcupanteEdicao(${o.id})" title="Editar Ocupante">✏️</button>
+              <button class="action-btn" style="color:var(--danger-text);" onclick="exonerarOcupante(${o.id})" title="Exonerar Ocupante">Exonerar</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+    
+    await carregarStatsComissionados();
+  } catch (e) {
+    toast('Erro ao carregar ocupantes: ' + e.message, 'err');
+  }
+}
+
+async function carregarStatsComissionados() {
+  try {
+    const rCargos = await fetch(`/api/cargos?tipo=Comissão`);
+    const cargos = await rCargos.json();
+    cacheCargosComissionados = cargos;
+    
+    const totalCargos = cargos.length;
+    let previstos = 0;
+    let ocupadas = 0;
+    
+    cargos.forEach(c => {
+      previstos += (c.total_previstos || 0);
+      ocupadas += (c.total_ocupados || 0);
+    });
+    
+    const saldo = previstos - ocupadas;
+    const taxaOcup = previstos > 0 ? (ocupadas / previstos * 100) : 0;
+    const taxaSaldo = previstos > 0 ? (saldo / previstos * 100) : 0;
+    
+    $('c-kpi-total-cargos').textContent = totalCargos;
+    $('c-kpi-previstas').textContent = previstos;
+    $('c-kpi-ocupadas').textContent = ocupadas;
+    $('c-kpi-ocupadas-percent').textContent = `${taxaOcup.toFixed(1)}% ocupação`;
+    
+    $('c-kpi-saldo').textContent = (saldo >= 0 ? '+' : '') + saldo;
+    $('c-kpi-saldo').style.color = saldo < 0 ? 'var(--danger-text)' : saldo === 0 ? 'var(--warning-text)' : 'var(--success-text)';
+    $('c-kpi-saldo-percent').textContent = `${taxaSaldo.toFixed(1)}% livres`;
+    
+    const saldoBar = $('c-kpi-saldo-bar');
+    if (saldo < 0) {
+      saldoBar.style.background = 'var(--danger-text)';
+    } else if (saldo === 0) {
+      saldoBar.style.background = 'var(--warning-text)';
+    } else {
+      saldoBar.style.background = 'var(--success-text)';
+    }
+  } catch (e) {
+    console.error('Erro ao carregar estatísticas de comissionados:', e);
+  }
+}
+
+async function carregarCargosComissionadosDropdown(cargoSelecionadoId = null) {
+  try {
+    let cargos = cacheCargosComissionados;
+    if (cargos.length === 0) {
+      const r = await fetch(`/api/cargos?tipo=Comissão`);
+      cargos = await r.json();
+      cacheCargosComissionados = cargos;
+    }
+    
+    const select = $('no-cargo');
+    select.innerHTML = '<option value="">Selecione o Cargo...</option>' + 
+      cargos.map(c => `<option value="${c.id}" ${cargoSelecionadoId && c.id === cargoSelecionadoId ? 'selected' : ''}>${c.nome} ${c.codigo_fopag ? `(FOPAG: ${c.codigo_fopag})` : ''}</option>`).join('');
+  } catch (e) {
+    toast('Erro ao preencher dropdown de cargos.', 'err');
+  }
+}
+
+function aoSelecionarCargoOcupante() {
+  const cargoId = parseInt($('no-cargo').value);
+  if (!cargoId) return;
+  
+  const cargo = cacheCargosComissionados.find(c => c.id === cargoId);
+  if (cargo) {
+    if (cargo.simbolo_vencimento) {
+      const selectSimbolo = $('no-simbolo');
+      let correspondencia = '';
+      for (let option of selectSimbolo.options) {
+        if (option.value && cargo.simbolo_vencimento.toUpperCase().includes(option.value.toUpperCase())) {
+          correspondencia = option.value;
+          break;
+        }
+      }
+      if (correspondencia) {
+        selectSimbolo.value = correspondencia;
+      } else {
+        selectSimbolo.value = "";
+      }
+    } else {
+      $('no-simbolo').value = "";
+    }
+    
+    if (cargo.recrutamento) {
+      const selectRec = $('no-recrutamento');
+      if (cargo.recrutamento.toLowerCase().includes('amplo')) {
+        selectRec.value = 'Amplo';
+      } else if (cargo.recrutamento.toLowerCase().includes('limitado')) {
+        selectRec.value = 'Limitado';
+      } else {
+        selectRec.value = "";
+      }
+    } else {
+      $('no-recrutamento').value = "";
+    }
+  }
+}
+
+let editOcupanteId = null;
+
+async function abrirModalNovoOcupante() {
+  editOcupanteId = null;
+  $('mo-title-ocupante').textContent = 'Nomear Novo Ocupante';
+  $('no-nome').value = '';
+  $('no-matricula').value = '';
+  $('no-portaria').value = '';
+  $('no-boletim').value = '';
+  $('no-data-nomeacao').value = '';
+  $('no-simbolo').value = '';
+  $('no-recrutamento').value = '';
+  
+  await carregarCargosComissionadosDropdown();
+  $('overlay-ocupante').classList.add('show');
+}
+
+async function abrirModalNovoOcupanteDireto() {
+  if (!state.cargoAtivo) return;
+  const cargoId = state.cargoAtivo.id;
+  
+  editOcupanteId = null;
+  $('mo-title-ocupante').textContent = 'Nomear Novo Ocupante';
+  $('no-nome').value = '';
+  $('no-matricula').value = '';
+  $('no-portaria').value = '';
+  $('no-boletim').value = '';
+  $('no-data-nomeacao').value = '';
+  $('no-simbolo').value = '';
+  $('no-recrutamento').value = '';
+  
+  await carregarCargosComissionadosDropdown(cargoId);
+  aoSelecionarCargoOcupante();
+  $('overlay-ocupante').classList.add('show');
+}
+
+async function abrirModalOcupanteEdicao(ocupanteId) {
+  try {
+    const r = await fetch(`/api/ocupantes/${ocupanteId}`);
+    const o = await r.json();
+    
+    editOcupanteId = ocupanteId;
+    $('mo-title-ocupante').textContent = 'Editar Dados do Ocupante';
+    $('no-nome').value = o.nome;
+    $('no-matricula').value = o.matricula;
+    $('no-portaria').value = o.portaria || '';
+    $('no-boletim').value = o.boletim_oficial || '';
+    $('no-data-nomeacao').value = o.data_nomeacao || '';
+    
+    await carregarCargosComissionadosDropdown(o.cargo_id);
+    $('no-simbolo').value = o.simbolo_vencimento || '';
+    $('no-recrutamento').value = o.tipo_recrutamento || '';
+    
+    $('overlay-ocupante').classList.add('show');
+  } catch (e) {
+    toast('Erro ao buscar dados do ocupante: ' + e.message, 'err');
+  }
+}
+
+function fecharModalOcupante() {
+  $('overlay-ocupante').classList.remove('show');
+}
+
+async function submitOcupante() {
+  const nome = $('no-nome').value.trim();
+  const matricula = $('no-matricula').value.trim();
+  const cargo_id = parseInt($('no-cargo').value);
+  
+  if (!nome || !matricula || !cargo_id) {
+    toast('Preencha os campos obrigatórios (*)', 'err');
+    return;
+  }
+  
+  const body = {
+    nome,
+    matricula,
+    cargo_id,
+    simbolo_vencimento: $('no-simbolo').value || null,
+    tipo_recrutamento: $('no-recrutamento').value || null,
+    portaria: $('no-portaria').value.trim() || null,
+    boletim_oficial: $('no-boletim').value.trim() || null,
+    data_nomeacao: $('no-data-nomeacao').value || null
+  };
+  
+  try {
+    const url = editOcupanteId ? `/api/ocupantes/${editOcupanteId}` : '/api/ocupantes';
+    const method = editOcupanteId ? 'PUT' : 'POST';
+    
+    const r = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    const res = await r.json();
+    if (!r.ok) throw new Error(res.detail || 'Erro ao salvar ocupante');
+    
+    fecharModalOcupante();
+    toast(res.mensagem || 'Salvo com sucesso!', 'ok');
+    
+    if ($('comissionados-wrap').style.display === 'block') {
+      carregarOcupantes();
+    }
+    
+    if ($('drawer').classList.contains('open') && state.cargoAtivo && (state.cargoAtivo.id === cargo_id || state.cargoAtivo.id === (cacheCargosComissionados.find(c => c.id === cargo_id)?.id))) {
+      await abrirDrawer(state.cargoAtivo.id, true);
+    }
+    
+    await carregarStats();
+    carregarCargos();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+async function exonerarOcupante(ocupanteId) {
+  if (!confirm("Tem certeza que deseja exonerar este ocupante?")) return;
+  try {
+    const r = await fetch(`/api/ocupantes/${ocupanteId}`, { method: 'DELETE' });
+    const res = await r.json();
+    if (!r.ok) throw new Error(res.detail || 'Erro ao exonerar ocupante');
+    
+    toast(res.mensagem, 'ok');
+    
+    if ($('comissionados-wrap').style.display === 'block') {
+      carregarOcupantes();
+    }
+    
+    if ($('drawer').classList.contains('open') && state.cargoAtivo) {
+      await abrirDrawer(state.cargoAtivo.id, true);
+    }
+    
+    await carregarStats();
+    carregarCargos();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
 // ── Teclado ────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { fecharDrawer(); fecharModalLei(); fecharModalCargo(); fecharModalOcupados(); }
+  if (e.key === 'Escape') { fecharDrawer(); fecharModalLei(); fecharModalCargo(); fecharModalOcupados(); fecharModalOcupante(); }
 });
 
 // ── Inicialização ──────────────────────────────────────────────────────────

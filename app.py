@@ -1,4 +1,4 @@
-import sqlite3, os, traceback
+import sqlite3, os, traceback, unicodedata
 from pathlib import Path
 from datetime import datetime
 
@@ -18,6 +18,16 @@ if not DB_PATH.exists():
         "Execute primeiro:  python criar_banco.py\n"
         "Ou use o iniciar.bat que faz isso automaticamente."
     )
+
+
+def remove_accents(text):
+    if not text:
+        return ""
+    return "".join(
+        c for c in unicodedata.normalize('NFD', text)
+        if unicodedata.category(c) != 'Mn'
+    ).lower()
+
 
 # ── Migração: Criar tabela Ocupantes e triggers se não existirem ──────────────
 def executar_migracao():
@@ -136,6 +146,7 @@ def get_db_connection():
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
+    con.create_function("remove_accents", 1, remove_accents)
     return con
 
 # ── Handler global de exceções ─────────────────────────────────────────────────
@@ -183,7 +194,7 @@ def listar_cargos():
     if tipo and tipo != "Todos":
         sql += " AND tipo_provimento = ?"; params.append(tipo)
     if q:
-        sql += " AND (nome LIKE ? OR codigo_fopag LIKE ?)"
+        sql += " AND (remove_accents(nome) LIKE remove_accents(?) OR remove_accents(codigo_fopag) LIKE remove_accents(?))"
         params += [f"%{q}%", f"%{q}%"]
     sql += " ORDER BY nome COLLATE NOCASE"
     
@@ -791,7 +802,7 @@ def listar_ocupantes():
     """
     params = []
     if q:
-        sql += " AND (o.nome LIKE ? OR o.matricula LIKE ? OR o.portaria LIKE ? OR c.nome LIKE ?)"
+        sql += " AND (remove_accents(o.nome) LIKE remove_accents(?) OR remove_accents(o.matricula) LIKE remove_accents(?) OR remove_accents(o.portaria) LIKE remove_accents(?) OR remove_accents(c.nome) LIKE remove_accents(?))"
         params += [f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"]
     if secretaria:
         sql += " AND c.secretaria = ?"
@@ -973,7 +984,10 @@ def listar_historico_exoneracoes():
         if q:
             query = """
                 SELECT * FROM HistoricoExoneracoes
-                WHERE nome LIKE ? OR matricula LIKE ? OR cargo_nome LIKE ? OR secretaria LIKE ?
+                WHERE remove_accents(nome) LIKE remove_accents(?) 
+                   OR remove_accents(matricula) LIKE remove_accents(?) 
+                   OR remove_accents(cargo_nome) LIKE remove_accents(?) 
+                   OR remove_accents(secretaria) LIKE remove_accents(?)
                 ORDER BY data_exoneracao DESC, nome COLLATE NOCASE
             """
             like_q = f"%{q}%"

@@ -779,11 +779,15 @@ def listar_ocupantes():
     secretaria = request.args.get("secretaria")
     
     sql = """
-        SELECT o.*, c.nome AS cargo_nome, c.codigo_fopag AS cargo_codigo_fopag, c.simbolo_vencimento AS cargo_simbolo_vencimento, c.secretaria AS cargo_secretaria,
+        SELECT o.id, o.nome, o.matricula, o.tipo_recrutamento, o.simbolo_vencimento,
+               o.portaria, o.boletim_oficial, o.data_nomeacao, o.criado_em, o.atualizado_em,
+               c.id AS cargo_id, c.nome AS cargo_nome, c.codigo_fopag AS cargo_codigo_fopag,
+               c.simbolo_vencimento AS cargo_simbolo_vencimento, c.secretaria AS cargo_secretaria,
                c.recrutamento AS cargo_recrutamento, c.restricao_exigencia AS cargo_restricao_exigencia
-        FROM Ocupantes o
-        JOIN Cargos c ON o.cargo_id = c.id
-        WHERE 1=1
+        FROM Cargos c
+        LEFT JOIN Ocupantes o ON o.cargo_id = c.id
+        WHERE c.tipo_provimento IN ('Comissão', 'Comissao', 'Eletivo')
+          AND (c.situacao = 'Em vigor' OR o.id IS NOT NULL)
     """
     params = []
     if q:
@@ -793,7 +797,7 @@ def listar_ocupantes():
         sql += " AND c.secretaria = ?"
         params.append(secretaria)
     
-    sql += " ORDER BY o.nome COLLATE NOCASE"
+    sql += " ORDER BY CASE WHEN o.nome IS NULL THEN 1 ELSE 0 END, o.nome COLLATE NOCASE, c.nome COLLATE NOCASE"
     
     con = get_db_connection()
     try:

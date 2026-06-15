@@ -3153,7 +3153,9 @@ async function carregarOcupantes() {
     const r = await fetch(url);
     const ocupantes = await r.json();
     
-    $('c-ocupantes-count').textContent = `${ocupantes.length} ocupante${ocupantes.length !== 1 ? 's' : ''}`;
+    const totalOcupados = ocupantes.filter(o => o.id).length;
+    const totalVagos = ocupantes.filter(o => !o.id).length;
+    $('c-ocupantes-count').textContent = `${totalOcupados} ocupado${totalOcupados !== 1 ? 's' : ''} / ${totalVagos} vago${totalVagos !== 1 ? 's' : ''}`;
     
     // 1. Renderizar Modo Tabela
     const tbody = $('c-ocupantes-tbody');
@@ -3162,27 +3164,39 @@ async function carregarOcupantes() {
     } else {
       tbody.innerHTML = ocupantes.map(o => {
         const dataNom = o.data_nomeacao ? o.data_nomeacao.split('-').reverse().join('/') : '—';
+        const matricula = o.matricula || '—';
+        const nome = o.nome ? o.nome : `<span style="color:var(--text-muted); font-style:italic;">Cargo Vago</span>`;
+        const simbolo = o.simbolo_vencimento || o.cargo_simbolo_vencimento || '—';
+        const recrutamento = o.tipo_recrutamento || o.cargo_recrutamento || '—';
+        const portaria = o.portaria || '—';
+        const bo_str = o.boletim_oficial ? `<span style="font-size:11px; color:var(--text-muted);">(${o.boletim_oficial})</span>` : '';
+        const portariaCompleta = o.portaria ? `${o.portaria} ${bo_str}` : '—';
+        
         return `
           <tr class="data-row" onclick="abrirDrawer(${o.cargo_id}, true)">
-            <td style="padding: 12px 16px; font-weight:600; color:var(--text-secondary); font-family:monospace;">${o.matricula}</td>
-            <td style="padding: 12px 16px; font-weight:700; color:var(--text-primary);">${o.nome}</td>
+            <td style="padding: 12px 16px; font-weight:600; color:var(--text-secondary); font-family:monospace;">${matricula}</td>
+            <td style="padding: 12px 16px; font-weight:700; color:var(--text-primary);">${nome}</td>
             <td style="padding: 12px 16px; font-weight:600; color:var(--blue-primary); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
               ${o.cargo_nome} ${o.cargo_codigo_fopag ? `<span class="td-code" style="font-size:10px; margin-left:4px;">Cód. ${o.cargo_codigo_fopag}</span>` : ''}
             </td>
             <td style="padding: 12px 16px; color:var(--text-secondary); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${o.cargo_restricao_exigencia || '—'}">
               ${o.cargo_restricao_exigencia || '—'}
             </td>
-            <td style="padding: 12px 16px; text-align:center; font-weight:600;">${o.simbolo_vencimento || '—'}</td>
+            <td style="padding: 12px 16px; text-align:center; font-weight:600;">${simbolo}</td>
             <td style="padding: 12px 16px; text-align:center;">
-              <span class="badge ${o.tipo_recrutamento === 'Amplo' ? 'badge-delib-salvo' : o.tipo_recrutamento === 'Limitado' ? 'badge-delib-env' : 'badge-delib-nao'}">
-                ${o.tipo_recrutamento || '—'}
+              <span class="badge ${recrutamento === 'Amplo' ? 'badge-delib-salvo' : recrutamento === 'Limitado' ? 'badge-delib-env' : 'badge-delib-nao'}">
+                ${recrutamento}
               </span>
             </td>
-            <td style="padding: 12px 16px; color:var(--text-secondary);">${o.portaria || '—'} ${o.boletim_oficial ? `<span style="font-size:11px; color:var(--text-muted);">(${o.boletim_oficial})</span>` : ''}</td>
-            <td style="padding: 12px 16px; text-align:center; font-weight:500;">${dataNom}</td>
+            <td style="padding: 12px 16px; color:var(--text-secondary);">${portariaCompleta}</td>
+            <td style="padding: 12px 16px; text-align:center; font-weight:500;">${o.id ? dataNom : '—'}</td>
             <td style="padding: 12px 16px; text-align:right;" onclick="event.stopPropagation()">
-              <button class="action-btn" onclick="abrirModalOcupanteEdicao(${o.id})" title="Editar Ocupante">✏️</button>
-              <button class="action-btn" style="color:var(--danger-text);" onclick="exonerarOcupante(${o.id})" title="Exonerar Ocupante">Exonerar</button>
+              ${o.id ? `
+                <button class="action-btn" onclick="abrirModalOcupanteEdicao(${o.id})" title="Editar Ocupante">✏️</button>
+                <button class="action-btn" style="color:var(--danger-text);" onclick="exonerarOcupante(${o.id})" title="Exonerar Ocupante">Exonerar</button>
+              ` : `
+                <button class="action-btn" style="color:var(--blue-primary); font-weight:600;" onclick="abrirModalNovoOcupanteDireto(${o.cargo_id})" title="Nomear Servidor">➕ Nomear</button>
+              `}
             </td>
           </tr>
         `;
@@ -3196,34 +3210,47 @@ async function carregarOcupantes() {
     } else {
       cardsGrid.innerHTML = ocupantes.map(o => {
         const dataNom = o.data_nomeacao ? o.data_nomeacao.split('-').reverse().join('/') : '—';
+        const matricula = o.matricula || '—';
+        const nome = o.nome ? o.nome : `<span style="color:var(--text-muted); font-style:italic;">Cargo Vago</span>`;
+        const simbolo = o.simbolo_vencimento || o.cargo_simbolo_vencimento || '—';
+        const recrutamento = o.tipo_recrutamento || o.cargo_recrutamento || '—';
+        
         return `
           <div class="cargo-card" style="cursor: pointer;" onclick="abrirDrawer(${o.cargo_id}, true)">
-            <div class="card-top vigor"></div>
+            <div class="card-top" style="background: ${o.id ? 'linear-gradient(90deg, var(--success), #34d399)' : 'var(--slate-300)'}"></div>
             <div class="card-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; flex: 1;">
               <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between;">
-                <span>Matrícula: ${o.matricula}</span>
-                <span>${o.simbolo_vencimento || '—'}</span>
+                <span>Matrícula: ${matricula}</span>
+                <span>${simbolo}</span>
               </div>
-              <div style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${o.nome}">
-                ${o.nome}
+              <div style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${o.nome || 'Cargo Vago'}">
+                ${nome}
               </div>
               <div style="font-size: 12px; font-weight: 600; color: var(--blue-primary); height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${o.cargo_nome}">
                 ${o.cargo_nome}
               </div>
               <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: flex; flex-direction: column; gap: 3px; border-top: 1px solid var(--slate-100); padding-top: 8px;">
-                <div><strong>Portaria:</strong> ${o.portaria || '—'} ${o.boletim_oficial ? `<span style="color:var(--text-muted);">(${o.boletim_oficial})</span>` : ''}</div>
-                <div><strong>Nomeação:</strong> ${dataNom}</div>
+                ${o.id ? `
+                  <div><strong>Portaria:</strong> ${o.portaria || '—'} ${o.boletim_oficial ? `<span style="color:var(--text-muted);">(${o.boletim_oficial})</span>` : ''}</div>
+                  <div><strong>Nomeação:</strong> ${dataNom}</div>
+                ` : `
+                  <div style="color: var(--text-muted); font-style: italic;">Aguardando nomeação de servidor</div>
+                `}
                 ${o.cargo_restricao_exigencia ? `<div style="margin-top: 3px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;" title="${o.cargo_restricao_exigencia}"><strong>Restrição:</strong> ${o.cargo_restricao_exigencia}</div>` : ''}
               </div>
               <div style="display: flex; gap: 6px; margin-top: auto; padding-top: 8px;">
-                <span class="badge ${o.tipo_recrutamento === 'Amplo' ? 'badge-delib-salvo' : o.tipo_recrutamento === 'Limitado' ? 'badge-delib-env' : 'badge-delib-nao'}" style="font-size: 10px;">
-                  Rec. ${o.tipo_recrutamento || '—'}
+                <span class="badge ${recrutamento === 'Amplo' ? 'badge-delib-salvo' : recrutamento === 'Limitado' ? 'badge-delib-env' : 'badge-delib-nao'}" style="font-size: 10px;">
+                  Rec. ${recrutamento}
                 </span>
               </div>
             </div>
             <div class="card-foot" style="padding: 10px 20px; background: var(--slate-50); display: flex; justify-content: flex-end; gap: 8px;" onclick="event.stopPropagation()">
-              <button class="action-btn" onclick="abrirModalOcupanteEdicao(${o.id})" title="Editar Ocupante">✏️</button>
-              <button class="action-btn" style="color:var(--danger-text);" onclick="exonerarOcupante(${o.id})" title="Exonerar Ocupante">Exonerar</button>
+              ${o.id ? `
+                <button class="action-btn" onclick="abrirModalOcupanteEdicao(${o.id})" title="Editar Ocupante">✏️</button>
+                <button class="action-btn" style="color:var(--danger-text);" onclick="exonerarOcupante(${o.id})" title="Exonerar Ocupante">Exonerar</button>
+              ` : `
+                <button class="action-btn" style="color:var(--blue-primary); font-weight:600;" onclick="abrirModalNovoOcupanteDireto(${o.cargo_id})">➕ Nomear Servidor</button>
+              `}
             </div>
           </div>
         `;
@@ -3236,16 +3263,24 @@ async function carregarOcupantes() {
       tbodyCompact.innerHTML = `<tr><td colspan="6" class="empty-state">Nenhum ocupante encontrado.</td></tr>`;
     } else {
       tbodyCompact.innerHTML = ocupantes.map(o => {
+        const matricula = o.matricula || '—';
+        const nome = o.nome ? o.nome : `<span style="color:var(--text-muted); font-style:italic;">Cargo Vago</span>`;
+        const simbolo = o.simbolo_vencimento || o.cargo_simbolo_vencimento || '—';
+        const portaria = o.portaria || '—';
         return `
           <tr class="data-row" style="border-bottom: 1px solid var(--border);" onclick="abrirDrawer(${o.cargo_id}, true)">
-            <td style="padding: 8px 12px; font-family: monospace; font-size: 12px; color: var(--text-secondary); font-weight: 600;">${o.matricula}</td>
-            <td style="padding: 8px 12px; font-weight: 700; font-size: 12.5px; color: var(--text-primary);">${o.nome}</td>
+            <td style="padding: 8px 12px; font-family: monospace; font-size: 12px; color: var(--text-secondary); font-weight: 600;">${matricula}</td>
+            <td style="padding: 8px 12px; font-weight: 700; font-size: 12.5px; color: var(--text-primary);">${nome}</td>
             <td style="padding: 8px 12px; font-size: 12px; color: var(--blue-primary); font-weight: 600; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${o.cargo_nome}</td>
-            <td style="padding: 8px 12px; font-size: 12px; text-align: center; font-weight: 600;">${o.simbolo_vencimento || '—'}</td>
-            <td style="padding: 8px 12px; font-size: 12px; color: var(--text-secondary);">${o.portaria || '—'}</td>
+            <td style="padding: 8px 12px; font-size: 12px; text-align: center; font-weight: 600;">${simbolo}</td>
+            <td style="padding: 8px 12px; font-size: 12px; color: var(--text-secondary);">${portaria}</td>
             <td style="padding: 8px 12px; text-align: right;" onclick="event.stopPropagation()">
-              <button class="action-btn" style="padding: 2px 4px; font-size: 11px;" onclick="abrirModalOcupanteEdicao(${o.id})">✏️</button>
-              <button class="action-btn" style="color:var(--danger-text); padding: 2px 4px; font-size: 11px;" onclick="exonerarOcupante(${o.id})">Exonerar</button>
+              ${o.id ? `
+                <button class="action-btn" style="padding: 2px 4px; font-size: 11px;" onclick="abrirModalOcupanteEdicao(${o.id})">✏️</button>
+                <button class="action-btn" style="color:var(--danger-text); padding: 2px 4px; font-size: 11px;" onclick="exonerarOcupante(${o.id})">Exonerar</button>
+              ` : `
+                <button class="action-btn" style="color:var(--blue-primary); padding: 2px 4px; font-size: 11px; font-weight:600;" onclick="abrirModalNovoOcupanteDireto(${o.cargo_id})">➕ Nomear</button>
+              `}
             </td>
           </tr>
         `;

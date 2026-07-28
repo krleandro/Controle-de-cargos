@@ -2,7 +2,8 @@ import sqlite3, os, traceback, unicodedata, difflib
 from pathlib import Path
 from datetime import datetime
 
-from flask import Flask, request, jsonify, send_file, render_template, abort
+from flask import Flask, request, jsonify, send_file, render_template, abort, session
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from relatorio_pdf import gerar_relatorio, gerar_relatorio_consolidado, gerar_relatorio_comissionados_secretaria
 
@@ -138,8 +139,57 @@ def executar_migracao():
 
 executar_migracao()
 
-# ── App ────────────────────────────────────────────────────────────────────────
+# ── App & Autenticação ────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder="static", template_folder="static")
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "controle_cargos_miracema_secret_2026_key_cgrpp")
+
+# Usuários e Senhas autorizados
+USER_CREDENTIALS = {
+    "cgrpp": generate_password_hash("34Carvalhos#")
+}
+
+@app.before_request
+def verificar_autenticacao():
+    # Permite acesso às rotas estáticas, arquivos do frontend e rotas de login
+    if request.path == "/" or request.path.startswith("/static") or request.path.startswith("/api/auth/"):
+        return None
+
+    # Exige autenticação para todos os endpoints da API /api/
+    if request.path.startswith("/api/"):
+        if not session.get("usuario"):
+            abort(401, description="Sessão não autenticada. Faça login no sistema para continuar.")
+
+@app.route("/api/auth/status", methods=["GET"])
+def auth_status():
+    """Retorna se a sessão atual está autenticada."""
+    usuario = session.get("usuario")
+    if usuario:
+        return jsonify({"autenticado": True, "usuario": usuario})
+    return jsonify({"autenticado": False})
+
+@app.route("/api/auth/login", methods=["POST"])
+def auth_login():
+    """Realiza a autenticação do usuário com usuário e senha."""
+    dados = request.get_json() or {}
+    usuario = (dados.get("usuario") or "").strip().lower()
+    senha = dados.get("senha") or ""
+
+    if not usuario or not senha:
+        abort(400, description="Usuário e senha são obrigatórios.")
+
+    hash_salvo = USER_CREDENTIALS.get(usuario)
+    if not hash_salvo or not check_password_hash(hash_salvo, senha):
+        abort(401, description="Usuário ou senha incorretos.")
+
+    session["usuario"] = usuario
+    session.permanent = True
+    return jsonify({"mensagem": "Login efetuado com sucesso.", "usuario": usuario})
+
+@app.route("/api/auth/logout", methods=["POST"])
+def auth_logout():
+    """Encerra a sessão do usuário."""
+    session.clear()
+    return jsonify({"mensagem": "Sessão encerrada com sucesso."})
 
 # ── Banco ──────────────────────────────────────────────────────────────────────
 def get_db_connection():

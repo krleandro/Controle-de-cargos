@@ -1000,6 +1000,48 @@
 </head>
 <body>
 
+<!-- ── TELA DE LOGIN ────────────────────────────────────────────────────────────── -->
+<div class="overlay" id="overlay-login" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 99999; display: flex; align-items: center; justify-content: center;">
+  <div style="width: 420px; max-width: 90vw; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px 28px; box-shadow: var(--shadow-xl); animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+    
+    <!-- Cabeçalho do Login -->
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="width: 56px; height: 56px; margin: 0 auto 12px; background: var(--bg-xlightblue); border: 1px solid var(--blue-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px;">
+        🏛️
+      </div>
+      <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0 0 4px 0;">Controle de Cargos</h2>
+      <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0;">Prefeitura Municipal de Miracema</p>
+      <span style="display: inline-block; margin-top: 8px; padding: 2px 10px; background: #e0f2fe; color: var(--blue-primary); border-radius: 12px; font-size: 11px; font-weight: 600;">🔒 Acesso Restrito</span>
+    </div>
+
+    <!-- Alerta de Erro de Autenticação -->
+    <div id="login-error-msg" style="display: none; padding: 10px 14px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: var(--radius-md); color: var(--danger-text); font-size: 12px; margin-bottom: 16px; font-weight: 500;">
+      <!-- Preenchido via JS -->
+    </div>
+
+    <!-- Form de Login -->
+    <form onsubmit="event.preventDefault(); fazerLogin();">
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label style="font-weight: 600; color: var(--text-primary); font-size: 12px; display: block; margin-bottom: 6px;">Usuário *</label>
+        <input type="text" id="login-usuario" class="form-control" placeholder="Digite seu usuário..." autocomplete="username" style="width: 100%; height: 42px; font-size: 13px;">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 24px;">
+        <label style="font-weight: 600; color: var(--text-primary); font-size: 12px; display: block; margin-bottom: 6px;">Senha *</label>
+        <input type="password" id="login-senha" class="form-control" placeholder="Digite sua senha..." autocomplete="current-password" style="width: 100%; height: 42px; font-size: 13px;">
+      </div>
+
+      <button type="submit" id="btn-login-submit" class="btn-primary" style="width: 100%; height: 44px; font-size: 14px; font-weight: 600; justify-content: center; background: linear-gradient(135deg, var(--blue-primary), #2563eb);">
+        🔓 Entrar no Sistema
+      </button>
+    </form>
+
+    <div style="text-align: center; margin-top: 20px; font-size: 11px; color: var(--text-muted);">
+      Sistema de Gestão de Pessoal e Cargos · PMM © 2026
+    </div>
+  </div>
+</div>
+
 <!-- ── SIDEBAR ──────────────────────────────────────────────────────────── -->
 <aside id="sidebar">
   <div class="sidebar-brand">
@@ -1028,6 +1070,10 @@
     </button>
   </nav>
   <div class="sidebar-footer">
+    <div id="user-badge-container" style="display:none; margin-bottom:12px; padding:8px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); font-size:12px; align-items:center; justify-content:space-between;">
+      <span style="font-weight:600; color:var(--text-primary);">👤 <span id="logged-user-name">cgrpp</span></span>
+      <button onclick="fazerLogout()" style="background:none; border:none; color:var(--danger-text); font-size:11px; font-weight:600; cursor:pointer;" title="Sair do sistema">🚪 Sair</button>
+    </div>
     <button class="nav-item" onclick="fazerBackup()" style="margin-bottom:12px; color: var(--blue-primary); background: var(--bg-xlightblue); border: 1px solid var(--blue-light); justify-content: center; font-weight: 600;">
       <span>💾</span> Fazer Backup do Banco
     </button>
@@ -4060,14 +4106,92 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// ── Autenticação ──────────────────────────────────────────────────────────────
+let usuarioAutenticado = null;
+
+async function verificarAutenticacaoStatus() {
+  try {
+    const r = await fetch('/api/auth/status');
+    const d = await r.json();
+    if (d.autenticado) {
+      usuarioAutenticado = d.usuario;
+      $('logged-user-name').textContent = d.usuario;
+      $('user-badge-container').style.display = 'flex';
+      $('overlay-login').style.display = 'none';
+      await recarregarTudo();
+    } else {
+      exibirTelaLogin();
+    }
+  } catch (e) {
+    exibirTelaLogin();
+  }
+}
+
+function exibirTelaLogin() {
+  usuarioAutenticado = null;
+  $('user-badge-container').style.display = 'none';
+  $('login-error-msg').style.display = 'none';
+  $('overlay-login').style.display = 'flex';
+}
+
+async function fazerLogin() {
+  const usuario = $('login-usuario').value.trim();
+  const senha = $('login-senha').value;
+  const errDiv = $('login-error-msg');
+  const btn = $('btn-login-submit');
+
+  if (!usuario || !senha) {
+    errDiv.textContent = 'Por favor, informe o usuário e a senha.';
+    errDiv.style.display = 'block';
+    return;
+  }
+
+  errDiv.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Autenticando...';
+
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario, senha })
+    });
+    const d = await r.json();
+
+    if (!r.ok) throw new Error(d.detail || 'Usuário ou senha incorretos.');
+
+    $('login-senha').value = '';
+    toast(d.mensagem || 'Login efetuado com sucesso!', 'ok');
+    await verificarAutenticacaoStatus();
+  } catch (e) {
+    errDiv.textContent = e.message;
+    errDiv.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔓 Entrar no Sistema';
+  }
+}
+
+async function fazerLogout() {
+  if (!confirm('Deseja realmente encerrar sua sessão?')) return;
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    toast('Sessão encerrada.', 'ok');
+    exibirTelaLogin();
+  } catch (e) {
+    exibirTelaLogin();
+  }
+}
+
 // ── Inicialização ──────────────────────────────────────────────────────────
 (async () => {
-  await carregarStats();
-  await carregarCargos();
+  await verificarAutenticacaoStatus();
 })();
 
-// Atualiza stats a cada 60s
-setInterval(carregarStats, 60000);
+// Atualiza stats a cada 60s se autenticado
+setInterval(() => {
+  if (usuarioAutenticado) carregarStats();
+}, 60000);
 </script>
 </body>
 </html>

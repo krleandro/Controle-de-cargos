@@ -1507,6 +1507,7 @@
   </div>
   <div class="drawer-footer">
     <button class="btn-outline" onclick="abrirModalCargoEdicao()">✏ Editar Cargo</button>
+    <button class="btn-outline" onclick="deletarCargoAtivo()" style="color:var(--danger-text); border-color:var(--danger-border);" title="Excluir Cargo do Sistema">🗑️ Excluir Cargo</button>
     <button class="btn-outline" onclick="gerarRelatorioPDF()" style="margin-left:auto">📄 Gerar Relatório</button>
     <button class="btn-ghost" id="d-btn-editar-ocupados" onclick="abrirModalOcupados()">✏ Ocupados</button>
   </div>
@@ -2516,6 +2517,33 @@ function abrirModalCargoEdicao() {
   if (typeof popularDatalistSecretarias === 'function') popularDatalistSecretarias();
   
   $('overlay-cargo').classList.add('show');
+}
+
+async function deletarCargoAtivo() {
+  if (!state.cargoAtivo) return;
+  const cargoId = state.cargoAtivo.id;
+  const cargoNome = state.cargoAtivo.nome;
+  
+  if (state.cargoAtivo.total_ocupados > 0) {
+    toast("Não é possível excluir um cargo com ocupantes ativos. Exonere os servidores primeiro.", "err");
+    return;
+  }
+  
+  if (!confirm(`Tem certeza de que deseja excluir o cargo "${cargoNome}" do sistema?\nEsta ação é irreversível e excluirá todo o histórico de leis e fontes associadas a este cargo.`)) {
+    return;
+  }
+  
+  try {
+    const r = await fetch(`/api/cargos/${cargoId}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Erro ao excluir cargo');
+    toast(d.mensagem || 'Cargo excluído com sucesso.', 'ok');
+    fecharDrawer();
+    await carregarStats();
+    carregarCargos();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
 }
 
 function fecharModalCargo() { $('overlay-cargo').classList.remove('show'); }

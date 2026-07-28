@@ -149,9 +149,13 @@ def get_db_connection():
     con.create_function("remove_accents", 1, remove_accents)
     return con
 
+from werkzeug.exceptions import HTTPException
+
 # ── Handler global de exceções ─────────────────────────────────────────────────
 @app.errorhandler(Exception)
 def handle_exception(e):
+    if isinstance(e, HTTPException):
+        return jsonify({"detail": e.description}), e.code
     tb = traceback.format_exc()
     print(f"[ERRO] {request.url}: {e}\n{tb}")
     return jsonify({"detail": str(e), "tipo": type(e).__name__}), 500
@@ -292,6 +296,25 @@ def atualizar_cargo(cargo_id):
         ))
         con.commit()
         return jsonify({"mensagem": "Cargo atualizado."})
+    finally:
+        con.close()
+
+@app.route("/api/cargos/<int:cargo_id>", methods=["DELETE"])
+def deletar_cargo(cargo_id):
+    """Exclui um cargo do sistema se não houver ocupantes ativos."""
+    con = get_db_connection()
+    try:
+        cargo = con.execute("SELECT nome, total_ocupados FROM Cargos WHERE id = ?", (cargo_id,)).fetchone()
+        if not cargo:
+            abort(404, description="Cargo não encontrado")
+            
+        ocupantes_count = con.execute("SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = ?", (cargo_id,)).fetchone()[0]
+        if ocupantes_count > 0 or cargo["total_ocupados"] > 0:
+            abort(400, description="Não é possível excluir um cargo que possui ocupantes ativos. Exonere os servidores primeiro.")
+            
+        con.execute("DELETE FROM Cargos WHERE id = ?", (cargo_id,))
+        con.commit()
+        return jsonify({"mensagem": "Cargo excluído com sucesso."})
     finally:
         con.close()
 

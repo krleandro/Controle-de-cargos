@@ -148,10 +148,14 @@ USER_CREDENTIALS = {
     "cgrpp": generate_password_hash("34Carvalhos#")
 }
 
+@app.route("/favicon.ico")
+def favicon():
+    return ("", 204)
+
 @app.before_request
 def verificar_autenticacao():
-    # Permite acesso às rotas estáticas, arquivos do frontend e rotas de login
-    if request.path == "/" or request.path.startswith("/static") or request.path.startswith("/api/auth/"):
+    # Permite acesso às rotas estáticas, arquivos do frontend, favicon e rotas de login
+    if request.path in ("/", "/favicon.ico") or request.path.startswith("/static") or request.path.startswith("/api/auth/"):
         return None
 
     # Exige autenticação para todos os endpoints da API /api/

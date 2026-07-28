@@ -2147,8 +2147,9 @@ function formatarCH(ch) {
 
 // ── Carregar stats ─────────────────────────────────────────────────────────
 async function carregarStats() {
+  if (!usuarioAutenticado) return;
   try {
-    const r = await fetch('/api/stats');
+    const r = await apiFetch('/api/stats');
     const d = await r.json();
     $('s-previstos').textContent = (d.total_previstos || 0).toLocaleString('pt-BR');
     $('s-ocupados').textContent  = (d.total_ocupados  || 0).toLocaleString('pt-BR');
@@ -2156,23 +2157,26 @@ async function carregarStats() {
     $('s-saldo').textContent = saldo.toLocaleString('pt-BR');
     $('s-saldo').style.color = saldo < 0 ? 'var(--danger-text)' : saldo === 0 ? 'var(--warning-text)' : 'var(--success-text)';
     $('s-alertas').textContent = d.alertas || 0;
-  } catch(e) { console.error(e); }
+  } catch(e) { if (!e.isAuth) console.error(e); }
 }
 
 // ── Carregar e renderizar cargos ───────────────────────────────────────────
 async function carregarCargos() {
+  if (!usuarioAutenticado) return;
   try {
     const params = new URLSearchParams();
     if (state.filtroSituacao !== 'Todos') params.set('situacao', state.filtroSituacao);
     if (state.filtroTipo     !== 'Todos') params.set('tipo', state.filtroTipo);
     if (state.search)                     params.set('q', state.search);
-    const r = await fetch('/api/cargos?' + params);
+    const r = await apiFetch('/api/cargos?' + params);
     state.cargos = await r.json();
     renderView();
     if (typeof popularFiltroSecretarias === 'function') popularFiltroSecretarias(true);
     if (typeof popularDatalistSecretarias === 'function') popularDatalistSecretarias(true);
   } catch(e) {
-    $('tbody').innerHTML = `<tr><td colspan="10" class="empty-state" style="color:var(--danger-text)">Erro ao carregar dados.</td></tr>`;
+    if (!e.isAuth) {
+      $('tbody').innerHTML = `<tr><td colspan="10" class="empty-state" style="color:var(--danger-text)">Erro ao carregar dados.</td></tr>`;
+    }
   }
 }
 
@@ -3057,6 +3061,10 @@ function atualizarBotoesFiltro() {
 }
 
 function setView(v, btn) {
+  if (!usuarioAutenticado) {
+    exibirTelaLogin();
+    return;
+  }
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   btn.querySelector('.nav-dot') || btn.insertAdjacentHTML('beforeend','<span class="nav-dot"></span>');
@@ -3277,8 +3285,9 @@ async function confirmarBaixarRelatorioConsolidado() {
 
 // ── Histórico de Leis Global ────────────────────────────────────────────────
 async function carregarHistoricoLeisGlobal() {
+  if (!usuarioAutenticado) return;
   try {
-    const res = await fetch('/api/leis/historico');
+    const res = await apiFetch('/api/leis/historico');
     if (!res.ok) throw new Error('Erro ao buscar histórico de leis');
     const laws = await res.json();
     
@@ -4108,6 +4117,24 @@ document.addEventListener('keydown', e => {
 
 // ── Autenticação ──────────────────────────────────────────────────────────────
 let usuarioAutenticado = null;
+
+async function apiFetch(url, options = {}) {
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+      exibirTelaLogin();
+      const err = new Error('Sessão não autenticada. Faça login para continuar.');
+      err.isAuth = true;
+      throw err;
+    }
+    return res;
+  } catch (e) {
+    if (e.isAuth) {
+      exibirTelaLogin();
+    }
+    throw e;
+  }
+}
 
 async function verificarAutenticacaoStatus() {
   try {

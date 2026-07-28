@@ -1673,6 +1673,7 @@
     <!-- Seleção Cargo Origem (Duplicado a ser excluído) -->
     <div class="form-group" style="margin-bottom: 16px;">
       <label style="font-weight:600; color:var(--text-primary); font-size:12px; display:block; margin-bottom:6px;">2. Selecionar Cargo Duplicado (Será MESCLADO e EXCLUÍDO) *</label>
+      <input type="text" class="form-control" id="mc-search-origem" placeholder="🔍 Digite para pesquisar cargo por nome, código FOPAG ou secretaria..." oninput="filtrarDropdownCargosMesclagem()" style="margin-bottom:6px; font-size:12px;">
       <select class="form-control" id="mc-select-origem" onchange="aoSelecionarCargoOrigemMesclagem()" style="width: 100%;">
         <option value="">Selecione o cargo a ser incorporado...</option>
       </select>
@@ -2044,7 +2045,27 @@ const $ = id => document.getElementById(id);
 let debounceTimer;
 function debouncedFetch() {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => { state.search = $('search').value; renderView(); }, 280);
+  debounceTimer = setTimeout(() => {
+    state.search = $('search').value;
+    if ($('comissionados-wrap') && $('comissionados-wrap').style.display === 'block') {
+      if ($('ocupante-search')) $('ocupante-search').value = state.search;
+      carregarOcupantes();
+    } else {
+      renderView();
+    }
+  }, 280);
+}
+
+async function recarregarTudo() {
+  await carregarStats();
+  await carregarCargos();
+  await carregarStatsComissionados();
+  if ($('comissionados-wrap') && $('comissionados-wrap').style.display === 'block') {
+    await carregarOcupantes();
+  }
+  if (typeof carregarCargosComissionadosDropdown === 'function') {
+    await carregarCargosComissionadosDropdown();
+  }
 }
 
 function toast(msg, tipo='') {
@@ -2647,8 +2668,7 @@ async function deletarCargoAtivo() {
     if (!r.ok) throw new Error(d.detail || 'Erro ao excluir cargo');
     toast(d.mensagem || 'Cargo excluído com sucesso.', 'ok');
     fecharDrawer();
-    await carregarStats();
-    carregarCargos();
+    await recarregarTudo();
   } catch (e) {
     toast(e.message, 'err');
   }
@@ -2656,6 +2676,30 @@ async function deletarCargoAtivo() {
 
 // ── Modal Mesclar Cargo ───────────────────────────────────────────────────
 let todosCargosParaMesclagem = [];
+
+function filtrarDropdownCargosMesclagem() {
+  const termo = ($('mc-search-origem') ? $('mc-search-origem').value : '').toLowerCase().trim();
+  const select = $('mc-select-origem');
+  if (!select) return;
+  const targetId = state.cargoAtivo ? state.cargoAtivo.id : null;
+  const valorAtual = select.value;
+
+  const cargosFiltrados = todosCargosParaMesclagem.filter(c => {
+    if (c.id === targetId) return false;
+    if (!termo) return true;
+    const nome = (c.nome || '').toLowerCase();
+    const cod = (c.codigo_fopag || '').toLowerCase();
+    const sec = (c.secretaria || '').toLowerCase();
+    return nome.includes(termo) || cod.includes(termo) || sec.includes(termo);
+  });
+
+  select.innerHTML = '<option value="">Selecione o cargo a ser incorporado...</option>' +
+    cargosFiltrados.map(c => `<option value="${c.id}">${c.nome} (${c.tipo_provimento} - ${c.secretaria || 'Sem Sec.'}) - Previstos: ${c.total_previstos}</option>`).join('');
+
+  if (valorAtual && cargosFiltrados.some(c => String(c.id) === String(valorAtual))) {
+    select.value = valorAtual;
+  }
+}
 
 async function abrirModalMesclarCargo(cargoDestinoId = null, cargoOrigemId = null) {
   let targetCargo = state.cargoAtivo;
@@ -2673,6 +2717,7 @@ async function abrirModalMesclarCargo(cargoDestinoId = null, cargoOrigemId = nul
   $('mc-impacto-box').style.display = 'none';
   $('mc-vagas-custom').style.display = 'none';
   $('mc-vagas-custom').value = '';
+  if ($('mc-search-origem')) $('mc-search-origem').value = '';
   const radioSomar = document.querySelector('input[name="mc-regra-vagas"][value="somar"]');
   if (radioSomar) radioSomar.checked = true;
   $('mc-preencher-nulos').checked = true;
@@ -2682,14 +2727,10 @@ async function abrirModalMesclarCargo(cargoDestinoId = null, cargoOrigemId = nul
     const cargos = await r.json();
     todosCargosParaMesclagem = cargos;
 
-    const select = $('mc-select-origem');
-    select.innerHTML = '<option value="">Selecione o cargo a ser incorporado...</option>' +
-      cargos
-        .filter(c => c.id !== targetCargo.id)
-        .map(c => `<option value="${c.id}">${c.nome} (${c.tipo_provimento} - ${c.secretaria || 'Sem Sec.'}) - Previstos: ${c.total_previstos}</option>`)
-        .join('');
+    filtrarDropdownCargosMesclagem();
 
     if (cargoOrigemId) {
+      const select = $('mc-select-origem');
       select.value = cargoOrigemId;
       aoSelecionarCargoOrigemMesclagem();
     }
@@ -2777,8 +2818,7 @@ async function confirmarMesclagemCargo() {
     toast(d.mensagem, 'ok');
 
     fecharDrawer();
-    await carregarStats();
-    carregarCargos();
+    await recarregarTudo();
   } catch (e) {
     toast(e.message, 'err');
   }
@@ -2881,7 +2921,7 @@ async function submitCargo() {
     if (state.isEditMode && state.cargoAtivo) {
         await abrirDrawer(state.cargoAtivo.id);
     }
-    carregarCargos(); carregarStats();
+    await recarregarTudo();
   } catch(e) { toast(e.message,'err'); }
 }
 
@@ -3848,16 +3888,11 @@ async function submitOcupante() {
     fecharModalOcupante();
     toast(res.mensagem || 'Salvo com sucesso!', 'ok');
     
-    if ($('comissionados-wrap').style.display === 'block') {
-      carregarOcupantes();
-    }
-    
-    if ($('drawer').classList.contains('open') && state.cargoAtivo && (state.cargoAtivo.id === cargo_id || state.cargoAtivo.id === (cacheCargosComissionados.find(c => c.id === cargo_id)?.id))) {
+    if ($('drawer').classList.contains('open') && state.cargoAtivo) {
       await abrirDrawer(state.cargoAtivo.id, true);
     }
     
-    await carregarStats();
-    carregarCargos();
+    await recarregarTudo();
   } catch (e) {
     toast(e.message, 'err');
   }
@@ -3952,8 +3987,7 @@ async function confirmarExoneracaoOcupante() {
       await abrirDrawer(state.cargoAtivo.id, true);
     }
     
-    await carregarStats();
-    carregarCargos();
+    await recarregarTudo();
   } catch (e) {
     toast(e.message, 'err');
   }

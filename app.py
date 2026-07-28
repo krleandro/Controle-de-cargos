@@ -177,7 +177,7 @@ def get_stats():
               SUM(CASE situacao WHEN 'Em vigor' THEN 1 ELSE 0 END) AS em_vigor,
               SUM(CASE situacao WHEN 'Extinto'  THEN 1 ELSE 0 END) AS extintos,
               SUM(CASE tipo_provimento WHEN 'Efetivo'  THEN 1 ELSE 0 END) AS efetivos,
-              SUM(CASE tipo_provimento WHEN 'Comissão' THEN 1 ELSE 0 END) AS comissao
+              SUM(CASE WHEN tipo_provimento IN ('Comissão', 'Comissao') THEN 1 ELSE 0 END) AS comissao
             FROM vw_SaldoVagas
         """).fetchone()
         return jsonify(dict(r))
@@ -830,7 +830,7 @@ def relatorios_comissionados_secretaria():
               COALESCE(SUM(saldo_vagas), 0)                     AS total_saldo,
               COALESCE(SUM(CASE WHEN saldo_vagas < 0 THEN 1 ELSE 0 END), 0)  AS alertas
             FROM vw_SaldoVagas
-            WHERE tipo_provimento IN ('Comissão', 'Eletivo')
+            WHERE tipo_provimento IN ('Comissão', 'Comissao', 'Eletivo')
         """).fetchone()
         stats = dict(res_stats)
 
@@ -843,7 +843,7 @@ def relatorios_comissionados_secretaria():
               COALESCE(SUM(total_ocupados), 0)                  AS vagas_ocupadas,
               COALESCE(SUM(saldo_vagas), 0)                     AS saldo
             FROM vw_SaldoVagas
-            WHERE tipo_provimento IN ('Comissão', 'Eletivo')
+            WHERE tipo_provimento IN ('Comissão', 'Comissao', 'Eletivo')
             GROUP BY secretaria
             ORDER BY secretaria COLLATE NOCASE
         """).fetchall()
@@ -861,7 +861,7 @@ def relatorios_comissionados_secretaria():
             SELECT id, nome, COALESCE(NULLIF(secretaria, ''), 'Não Informada') AS sec_name,
                    total_previstos, total_ocupados, saldo_vagas, simbolo_vencimento, recrutamento
             FROM vw_SaldoVagas
-            WHERE tipo_provimento IN ('Comissão', 'Eletivo')
+            WHERE tipo_provimento IN ('Comissão', 'Comissao', 'Eletivo')
             ORDER BY sec_name COLLATE NOCASE, nome COLLATE NOCASE
         """).fetchall()
 

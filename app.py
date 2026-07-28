@@ -1,4 +1,4 @@
-import sqlite3, os, traceback, unicodedata
+import sqlite3, os, traceback, unicodedata, difflib
 from pathlib import Path
 from datetime import datetime
 
@@ -315,6 +315,132 @@ def deletar_cargo(cargo_id):
         con.execute("DELETE FROM Cargos WHERE id = ?", (cargo_id,))
         con.commit()
         return jsonify({"mensagem": "Cargo excluído com sucesso."})
+    finally:
+        con.close()
+
+
+@app.route("/api/cargos/mesclar", methods=["POST"])
+def mesclar_cargos():
+    """Mescla as informações e vínculos de um cargo duplicado (origem) no cargo principal (destino)."""
+    dados = request.get_json() or {}
+    cargo_destino_id = dados.get("cargo_destino_id")
+    cargo_origem_id = dados.get("cargo_origem_id")
+    regra_vagas = dados.get("regra_vagas", "somar")
+    vagas_custom = dados.get("vagas_custom")
+    preencher_campos = dados.get("preencher_campos_nulos", True)
+
+    if not cargo_destino_id or not cargo_origem_id:
+        abort(400, description="cargo_destino_id e cargo_origem_id são obrigatórios.")
+
+    if cargo_destino_id == cargo_origem_id:
+        abort(400, description="O cargo de destino e de origem não podem ser o mesmo.")
+
+    con = get_db_connection()
+    try:
+        cargo_dest = con.execute("SELECT * FROM Cargos WHERE id = ?", (cargo_destino_id,)).fetchone()
+        cargo_orig = con.execute("SELECT * FROM Cargos WHERE id = ?", (cargo_origem_id,)).fetchone()
+
+        if not cargo_dest:
+            abort(404, description="Cargo de destino (principal) não encontrado.")
+        if not cargo_orig:
+            abort(404, description="Cargo de origem (duplicado) não encontrado.")
+
+        dest_dict = dict(cargo_dest)
+        orig_dict = dict(cargo_orig)
+
+        # 1. Transferir Ocupantes
+        con.execute("UPDATE Ocupantes SET cargo_id = ? WHERE cargo_id = ?", (cargo_destino_id, cargo_origem_id))
+
+        # 2. Transferir LeisPertinentes
+        con.execute("UPDATE LeisPertinentes SET cargo_id = ? WHERE cargo_id = ?", (cargo_destino_id, cargo_origem_id))
+
+        # 3. Transferir FontesCargaHoraria
+        con.execute("UPDATE FontesCargaHoraria SET cargo_id = ? WHERE cargo_id = ?", (cargo_destino_id, cargo_origem_id))
+
+        # 4. Transferir HistoricoExoneracoes
+        con.execute("UPDATE HistoricoExoneracoes SET cargo_id = ? WHERE cargo_id = ?", (cargo_destino_id, cargo_origem_id))
+
+        # 5. Preencher campos em branco no destino com valores da origem
+        campos_para_preencher = [
+            "codigo_fopag", "secretaria", "escolaridade", "simbolo_vencimento",
+            "carga_horaria", "atribuicoes", "recrutamento", "restricao_exigencia",
+            "fonte_carga_horaria", "fonte_atribuicoes"
+        ]
+        updates = {}
+        if preencher_campos:
+            for campo in campos_para_preencher:
+                val_dest = dest_dict.get(campo)
+                val_orig = orig_dict.get(campo)
+                if (val_dest is None or str(val_dest).strip() == "" or str(val_dest).strip() == "—") and (val_orig is not None and str(val_orig).strip() != "" and str(val_orig).strip() != "—"):
+                    updates[campo] = val_orig
+
+        # 6. Definir vagas previstas
+        vagas_dest = dest_dict.get("total_previstos", 0) or 0
+        vagas_orig = orig_dict.get("total_previstos", 0) or 0
+
+        if regra_vagas == "somar":
+            novas_vagas = vagas_dest + vagas_orig
+        elif regra_vagas == "personalizado" and vagas_custom is not None:
+            novas_vagas = max(0, int(vagas_custom))
+        else:
+            novas_vagas = vagas_dest
+
+        updates["total_previstos"] = novas_vagas
+
+        # 7. Recalcular total_ocupados do destino baseado nos ocupantes reais
+        total_ocup_novo = con.execute("SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = ?", (cargo_destino_id,)).fetchone()[0]
+        updates["total_ocupados"] = total_ocup_novo
+        updates["atualizado_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Aplica updates no cargo destino
+        set_clauses = [f"{k} = ?" for k in updates.keys()]
+        set_values = list(updates.values())
+        set_values.append(cargo_destino_id)
+
+        sql_update = f"UPDATE Cargos SET {', '.join(set_clauses)} WHERE id = ?"
+        con.execute(sql_update, set_values)
+
+        # 8. Excluir o cargo origem (duplicado)
+        con.execute("DELETE FROM Cargos WHERE id = ?", (cargo_origem_id,))
+
+        con.commit()
+        return jsonify({
+            "mensagem": f"Cargo '{orig_dict['nome']}' mesclado com sucesso no cargo '{dest_dict['nome']}'.",
+            "cargo_id": cargo_destino_id
+        })
+    finally:
+        con.close()
+
+
+@app.route("/api/cargos/sugestoes-duplicados", methods=["GET"])
+def sugerir_cargos_duplicados():
+    """Analisa os cargos e retorna pares com nomes altamente semelhantes."""
+    con = get_db_connection()
+    try:
+        cargos = con.execute("SELECT id, nome, tipo_provimento, secretaria, total_previstos, total_ocupados FROM Cargos ORDER BY nome").fetchall()
+        cargos_list = [dict(c) for c in cargos]
+
+        sugestoes = []
+        n = len(cargos_list)
+        for i in range(n):
+            c1 = cargos_list[i]
+            n1_norm = remove_accents(c1["nome"])
+            for j in range(i + 1, n):
+                c2 = cargos_list[j]
+                n2_norm = remove_accents(c2["nome"])
+
+                ratio = difflib.SequenceMatcher(None, n1_norm, n2_norm).ratio()
+                is_substring = (len(n1_norm) > 6 and len(n2_norm) > 6) and (n1_norm in n2_norm or n2_norm in n1_norm)
+
+                if ratio >= 0.82 or is_substring:
+                    sugestoes.append({
+                        "cargo1": c1,
+                        "cargo2": c2,
+                        "similaridade": round(ratio * 100, 1)
+                    })
+
+        sugestoes.sort(key=lambda x: x["similaridade"], reverse=True)
+        return jsonify(sugestoes[:30])
     finally:
         con.close()
 

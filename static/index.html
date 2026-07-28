@@ -1100,8 +1100,10 @@
       </div>
       <span id="toolbar-count"></span>
 
-      <!-- Botão de lei + alternância de view -->
       <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+        <button class="btn-outline" onclick="abrirModalSugestoesDuplicados()" title="Analisar e sugerir cargos potencialmente duplicados">
+          🔍 Sugestões de Duplicados
+        </button>
         <button class="btn-outline" onclick="abrirModalLeiGlobal()">
           ⚖ Registrar Lei
         </button>
@@ -1507,6 +1509,7 @@
   </div>
   <div class="drawer-footer">
     <button class="btn-outline" onclick="abrirModalCargoEdicao()">✏ Editar Cargo</button>
+    <button class="btn-outline" onclick="abrirModalMesclarCargo()" title="Mesclar informações com outro cargo duplicado">🔀 Mesclar Cargo</button>
     <button class="btn-outline" onclick="deletarCargoAtivo()" style="color:var(--danger-text); border-color:var(--danger-border);" title="Excluir Cargo do Sistema">🗑️ Excluir Cargo</button>
     <button class="btn-outline" onclick="gerarRelatorioPDF()" style="margin-left:auto">📄 Gerar Relatório</button>
     <button class="btn-ghost" id="d-btn-editar-ocupados" onclick="abrirModalOcupados()">✏ Ocupados</button>
@@ -1645,6 +1648,111 @@
     <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:18px;">
       <button class="btn-ghost" onclick="fecharModalExoneracao()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:1px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;">Cancelar</button>
       <button class="btn-primary" onclick="confirmarExoneracaoOcupante()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:none; background:linear-gradient(135deg, var(--danger-text), #ef4444); color:#fff; cursor:pointer; box-shadow:var(--shadow-md);">Confirmar Exoneração</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: MESCLAR CARGO DUPLICADO ────────────────────────────────────────────── -->
+<div class="overlay" id="overlay-mesclar-cargo" onclick="if(event.target===this)fecharModalMesclarCargo()">
+  <div class="modal" style="width: 580px;">
+    <div class="modal-header">
+      <div>
+        <h2>Mesclar Informações de Cargos</h2>
+        <p style="color:var(--text-secondary); font-size:12px; margin-top:4px;">Unifique dois cargos duplicados migrando todos os vínculos automaticamente</p>
+      </div>
+      <button class="close-btn" onclick="fecharModalMesclarCargo()">×</button>
+    </div>
+
+    <!-- Card Cargo Destino (Mantido) -->
+    <div style="padding: 14px 16px; background: var(--bg-xlightblue); border: 1px solid var(--blue-light); border-radius: var(--radius-md); margin-bottom: 16px;">
+      <div style="font-size: 10px; font-weight: 700; color: var(--blue-primary); text-transform: uppercase; letter-spacing: 0.5px;">1. Cargo Principal (Será MANTIDO no sistema)</div>
+      <div id="mc-dest-nome" style="font-size: 14.5px; font-weight: 700; color: var(--text-primary); margin-top: 4px;">—</div>
+      <div id="mc-dest-info" style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">—</div>
+    </div>
+
+    <!-- Seleção Cargo Origem (Duplicado a ser excluído) -->
+    <div class="form-group" style="margin-bottom: 16px;">
+      <label style="font-weight:600; color:var(--text-primary); font-size:12px; display:block; margin-bottom:6px;">2. Selecionar Cargo Duplicado (Será MESCLADO e EXCLUÍDO) *</label>
+      <select class="form-control" id="mc-select-origem" onchange="aoSelecionarCargoOrigemMesclagem()" style="width: 100%;">
+        <option value="">Selecione o cargo a ser incorporado...</option>
+      </select>
+    </div>
+
+    <!-- Resumo de Impacto Dinâmico -->
+    <div id="mc-impacto-box" style="display: none; padding: 12px 14px; background: #fff8f6; border: 1px solid #fecaca; border-radius: var(--radius-md); margin-bottom: 16px; font-size: 12px; color: var(--text-primary);">
+      <div style="font-weight: 700; color: var(--danger-text); margin-bottom: 4px;">⚡ Resumo da Migração:</div>
+      <ul style="margin: 0; padding-left: 18px; line-height: 1.5; color: var(--text-secondary);">
+        <li id="mc-impacto-ocupantes">Ocupantes a migrar: 0</li>
+        <li id="mc-impacto-leis">Leis e históricos a migrar: 0</li>
+        <li style="color: var(--danger-text); font-weight: 600;">O cargo selecionado acima será excluído permanentemente.</li>
+      </ul>
+    </div>
+
+    <!-- Regra de Vagas Previstas -->
+    <div style="margin-bottom: 16px; border-top: 1px solid var(--border); padding-top: 14px;">
+      <label style="font-weight:700; color:var(--text-primary); font-size:12.5px; display:block; margin-bottom:8px;">3. Regra para Vagas Previstas</label>
+      
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
+          <input type="radio" name="mc-regra-vagas" value="somar" checked onchange="aoMudarRegraVagasMesclagem()">
+          <span><strong>Somar Vagas</strong> (<span id="mc-prev-vagas-somar">Vagas Destino + Origem</span>)</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
+          <input type="radio" name="mc-regra-vagas" value="manter" onchange="aoMudarRegraVagasMesclagem()">
+          <span><strong>Manter Vagas do Cargo Principal</strong></span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
+          <input type="radio" name="mc-regra-vagas" value="personalizado" onchange="aoMudarRegraVagasMesclagem()">
+          <span><strong>Definir Quantidade Personalizada:</strong></span>
+          <input type="number" id="mc-vagas-custom" class="form-control" style="width: 80px; height: 30px; padding: 2px 8px; display: none;" min="0">
+        </label>
+      </div>
+    </div>
+
+    <!-- Preenchimento Automático -->
+    <div style="margin-bottom: 20px;">
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); cursor: pointer;">
+        <input type="checkbox" id="mc-preencher-nulos" checked>
+        <span>Preencher campos em branco do cargo principal com os dados do cargo duplicado</span>
+      </label>
+    </div>
+
+    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:16px;">
+      <button class="btn-ghost" onclick="fecharModalMesclarCargo()">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarMesclagemCargo()" style="background: linear-gradient(135deg, var(--blue-primary), #2563eb);">Confirmar e Mesclar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: SUGESTÕES DE CARGOS DUPLICADOS ─────────────────────────────────── -->
+<div class="overlay" id="overlay-sugestoes-duplicados" onclick="if(event.target===this)fecharModalSugestoesDuplicados()">
+  <div class="modal" style="width: 800px; max-width: 95vw;">
+    <div class="modal-header">
+      <div>
+        <h2>Sugestões de Cargos Duplicados</h2>
+        <p style="color:var(--text-secondary); font-size:12px; margin-top:4px;">Análise inteligente de cargos com grafia ou nomes semelhantes no sistema</p>
+      </div>
+      <button class="close-btn" onclick="fecharModalSugestoesDuplicados()">×</button>
+    </div>
+
+    <div class="table-scroll" style="max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md);">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+        <thead>
+          <tr style="background: #f8fafc; border-bottom: 1px solid var(--border); text-align: left; position: sticky; top: 0; z-index: 10;">
+            <th style="padding: 10px 14px; font-weight: 600; color: var(--text-secondary);">Cargo A</th>
+            <th style="padding: 10px 14px; font-weight: 600; color: var(--text-secondary);">Cargo B (Semelhante)</th>
+            <th style="padding: 10px 14px; font-weight: 600; color: var(--text-secondary); text-align: center;">Similaridade</th>
+            <th style="padding: 10px 14px; font-weight: 600; color: var(--text-secondary); text-align: right;">Ação</th>
+          </tr>
+        </thead>
+        <tbody id="sugestoes-duplicados-tbody">
+          <!-- Gerado dinamicamente -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:16px; margin-top: 16px;">
+      <button class="btn-primary" onclick="fecharModalSugestoesDuplicados()">Fechar</button>
     </div>
   </div>
 </div>
@@ -2544,6 +2652,191 @@ async function deletarCargoAtivo() {
   } catch (e) {
     toast(e.message, 'err');
   }
+}
+
+// ── Modal Mesclar Cargo ───────────────────────────────────────────────────
+let todosCargosParaMesclagem = [];
+
+async function abrirModalMesclarCargo(cargoDestinoId = null, cargoOrigemId = null) {
+  let targetCargo = state.cargoAtivo;
+  if (cargoDestinoId) {
+    targetCargo = state.cargos ? state.cargos.find(c => c.id === cargoDestinoId) : state.cargoAtivo;
+  }
+  if (!targetCargo) {
+    toast('Selecione um cargo principal para mesclar.', 'err');
+    return;
+  }
+
+  $('mc-dest-nome').textContent = targetCargo.nome;
+  $('mc-dest-info').textContent = `Provimento: ${targetCargo.tipo_provimento} · Vagas Previstas: ${targetCargo.total_previstos} · Ocupadas: ${targetCargo.total_ocupados}`;
+  
+  $('mc-impacto-box').style.display = 'none';
+  $('mc-vagas-custom').style.display = 'none';
+  $('mc-vagas-custom').value = '';
+  const radioSomar = document.querySelector('input[name="mc-regra-vagas"][value="somar"]');
+  if (radioSomar) radioSomar.checked = true;
+  $('mc-preencher-nulos').checked = true;
+
+  try {
+    const r = await fetch('/api/cargos');
+    const cargos = await r.json();
+    todosCargosParaMesclagem = cargos;
+
+    const select = $('mc-select-origem');
+    select.innerHTML = '<option value="">Selecione o cargo a ser incorporado...</option>' +
+      cargos
+        .filter(c => c.id !== targetCargo.id)
+        .map(c => `<option value="${c.id}">${c.nome} (${c.tipo_provimento} - ${c.secretaria || 'Sem Sec.'}) - Previstos: ${c.total_previstos}</option>`)
+        .join('');
+
+    if (cargoOrigemId) {
+      select.value = cargoOrigemId;
+      aoSelecionarCargoOrigemMesclagem();
+    }
+
+    $('overlay-mesclar-cargo').classList.add('show');
+  } catch (e) {
+    toast('Erro ao preparar lista de cargos: ' + e.message, 'err');
+  }
+}
+
+function fecharModalMesclarCargo() {
+  $('overlay-mesclar-cargo').classList.remove('show');
+}
+
+function aoMudarRegraVagasMesclagem() {
+  const radio = document.querySelector('input[name="mc-regra-vagas"]:checked');
+  const regra = radio ? radio.value : 'somar';
+  $('mc-vagas-custom').style.display = regra === 'personalizado' ? 'inline-block' : 'none';
+}
+
+async function aoSelecionarCargoOrigemMesclagem() {
+  const origemId = parseInt($('mc-select-origem').value);
+  if (!origemId || !state.cargoAtivo) {
+    $('mc-impacto-box').style.display = 'none';
+    return;
+  }
+
+  const origCargo = todosCargosParaMesclagem.find(c => c.id === origemId);
+  if (!origCargo) return;
+
+  try {
+    const r = await fetch(`/api/cargos/${origemId}`);
+    const data = await r.json();
+    const ocupantesCount = data.ocupantes ? data.ocupantes.length : (origCargo.total_ocupados || 0);
+    const leisCount = data.leis ? data.leis.length : 0;
+
+    $('mc-impacto-ocupantes').textContent = `Ocupantes a serem migrados: ${ocupantesCount}`;
+    $('mc-impacto-leis').textContent = `Leis e históricos a re-vincular: ${leisCount}`;
+    $('mc-prev-vagas-somar').textContent = `${state.cargoAtivo.total_previstos} + ${origCargo.total_previstos} = ${state.cargoAtivo.total_previstos + origCargo.total_previstos} vagas`;
+    $('mc-impacto-box').style.display = 'block';
+  } catch (e) {
+    console.error('Erro ao verificar impacto:', e);
+  }
+}
+
+async function confirmarMesclagemCargo() {
+  if (!state.cargoAtivo) return;
+  const cargoDestinoId = state.cargoAtivo.id;
+  const cargoOrigemId = parseInt($('mc-select-origem').value);
+
+  if (!cargoOrigemId) {
+    toast('Selecione o cargo duplicado a ser incorporado.', 'err');
+    return;
+  }
+
+  const origCargo = todosCargosParaMesclagem.find(c => c.id === cargoOrigemId);
+  const origNome = origCargo ? origCargo.nome : 'o cargo selecionado';
+
+  const confirmacao = confirm(`ATENÇÃO: Você está prestes a incorporar "${origNome}" ao cargo "${state.cargoAtivo.nome}".\n\nTodos os ocupantes e leis serão transferidos e o cargo "${origNome}" SERÁ EXCLUÍDO PERMANENTEMENTE.\n\nDeseja continuar?`);
+  if (!confirmacao) return;
+
+  const radio = document.querySelector('input[name="mc-regra-vagas"]:checked');
+  const regraVagas = radio ? radio.value : 'somar';
+  const vagasCustom = $('mc-vagas-custom').value ? parseInt($('mc-vagas-custom').value) : null;
+  const preencherNulos = $('mc-preencher-nulos').checked;
+
+  const body = {
+    cargo_destino_id: cargoDestinoId,
+    cargo_origem_id: cargoOrigemId,
+    regra_vagas: regraVagas,
+    vagas_custom: vagasCustom,
+    preencher_campos_nulos: preencherNulos
+  };
+
+  try {
+    const r = await fetch('/api/cargos/mesclar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Erro ao mesclar cargos');
+
+    fecharModalMesclarCargo();
+    toast(d.mensagem, 'ok');
+
+    fecharDrawer();
+    await carregarStats();
+    carregarCargos();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+// ── Modal Sugestões de Cargos Duplicados ─────────────────────────────────
+async function abrirModalSugestoesDuplicados() {
+  try {
+    toast('Analisando cargos no banco de dados...', 'ok');
+    const r = await fetch('/api/cargos/sugestoes-duplicados');
+    const sugestoes = await r.json();
+
+    const tbody = $('sugestoes-duplicados-tbody');
+    if (!sugestoes || sugestoes.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="empty-state" style="padding: 24px; text-align: center; color: var(--text-muted);">Nenhum cargo com nome duplicado ou altamente semelhante encontrado.</td></tr>`;
+    } else {
+      tbody.innerHTML = sugestoes.map(s => {
+        const c1 = s.cargo1;
+        const c2 = s.cargo2;
+        return `
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 10px 14px;">
+              <div style="font-weight:700; color:var(--text-primary);">${c1.nome}</div>
+              <div style="font-size:11px; color:var(--text-secondary);">${c1.tipo_provimento} · ${c1.secretaria || 'Sem Sec.'} (Prev: ${c1.total_previstos} / Ocup: ${c1.total_ocupados})</div>
+            </td>
+            <td style="padding: 10px 14px;">
+              <div style="font-weight:700; color:var(--text-primary);">${c2.nome}</div>
+              <div style="font-size:11px; color:var(--text-secondary);">${c2.tipo_provimento} · ${c2.secretaria || 'Sem Sec.'} (Prev: ${c2.total_previstos} / Ocup: ${c2.total_ocupados})</div>
+            </td>
+            <td style="padding: 10px 14px; text-align:center;">
+              <span class="badge ${s.similaridade >= 90 ? 'badge-delib-salvo' : 'badge-delib-env'}" style="font-size: 11px;">
+                ${s.similaridade}%
+              </span>
+            </td>
+            <td style="padding: 10px 14px; text-align:right;">
+              <button class="action-btn" style="color:var(--blue-primary); font-weight:600; padding: 4px 8px; border: 1px solid var(--blue-light); border-radius: var(--radius-sm);" onclick="iniciarMesclagemSugerida(${c1.id}, ${c2.id})" title="Mesclar estes cargos">
+                🔀 Mesclar
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    $('overlay-sugestoes-duplicados').classList.add('show');
+  } catch (e) {
+    toast('Erro ao buscar sugestões: ' + e.message, 'err');
+  }
+}
+
+function fecharModalSugestoesDuplicados() {
+  $('overlay-sugestoes-duplicados').classList.remove('show');
+}
+
+async function iniciarMesclagemSugerida(cargoDestinoId, cargoOrigemId) {
+  fecharModalSugestoesDuplicados();
+  await abrirDrawer(cargoDestinoId, true);
+  await abrirModalMesclarCargo(cargoDestinoId, cargoOrigemId);
 }
 
 function fecharModalCargo() { $('overlay-cargo').classList.remove('show'); }
@@ -3728,6 +4021,8 @@ document.addEventListener('keydown', e => {
     fecharModalOcupante();
     fecharModalExoneracao();
     fecharModalHistoricoExoneracoes();
+    fecharModalMesclarCargo();
+    fecharModalSugestoesDuplicados();
   }
 });
 

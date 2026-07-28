@@ -1001,8 +1001,8 @@
 <body>
 
 <!-- ── TELA DE LOGIN ────────────────────────────────────────────────────────────── -->
-<div class="overlay" id="overlay-login" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 99999; display: flex; align-items: center; justify-content: center;">
-  <div style="width: 420px; max-width: 90vw; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px 28px; box-shadow: var(--shadow-xl); animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+<div class="overlay" id="overlay-login" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 99999;">
+  <div class="modal" style="width: 420px; max-width: 90vw; padding: 32px 28px; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl);">
     
     <!-- Cabeçalho do Login -->
     <div style="text-align: center; margin-bottom: 24px;">
@@ -4144,7 +4144,7 @@ async function verificarAutenticacaoStatus() {
       usuarioAutenticado = d.usuario;
       $('logged-user-name').textContent = d.usuario;
       $('user-badge-container').style.display = 'flex';
-      $('overlay-login').style.display = 'none';
+      $('overlay-login').classList.remove('show');
       await recarregarTudo();
     } else {
       exibirTelaLogin();
@@ -4158,7 +4158,7 @@ function exibirTelaLogin() {
   usuarioAutenticado = null;
   $('user-badge-container').style.display = 'none';
   $('login-error-msg').style.display = 'none';
-  $('overlay-login').style.display = 'flex';
+  $('overlay-login').classList.add('show');
 }
 
 async function fazerLogin() {

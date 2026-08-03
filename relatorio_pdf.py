@@ -1648,3 +1648,113 @@ def gerar_relatorio_comissionados_secretaria(stats: dict, secretarias_summary: l
     pdf = RelatorioComissionadosSecretariaPDF()
     pdf.montar(stats, secretarias_summary, cargos_by_sec)
     return bytes(pdf.output(dest="S"))
+
+
+def gerar_relatorio_cargos_selecionados(cargos_detalhados: list) -> bytes:
+    """
+    Gera o PDF consolidado dos cargos selecionados pelo usuário.
+    Cada cargo selecionado inicia estritamente em uma nova página (quebra de página por cargo).
+    """
+    pdf = RelatorioCargoPDF()
+    
+    # ── Capa do Relatório de Cargos Selecionados ──
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=False, margin=0)
+    
+    PAGE_H = 297
+    # Banner azul no topo
+    pdf.set_fill_color(*AZUL_INST)
+    pdf.rect(x=0, y=0, w=pdf.PAGE_W, h=52, style="F")
+    
+    pdf.set_fill_color(30, 80, 150)
+    pdf.polygon([(140, 0), (210, 0), (210, 52), (170, 52)], style="F")
+    pdf.set_fill_color(40, 95, 175)
+    pdf.polygon([(175, 0), (210, 0), (210, 52), (195, 52)], style="F")
+    
+    pdf.set_fill_color(*DOURADO)
+    pdf.rect(x=0, y=52, w=pdf.PAGE_W, h=1.2, style="F")
+    
+    pdf.set_xy(pdf.MARGIN_X, 12)
+    pdf._set_font("B", 28)
+    pdf.set_text_color(*BRANCO)
+    pdf.cell(w=100, h=12, txt="FOPAG", align="L", ln=1)
+    
+    pdf.set_x(pdf.MARGIN_X)
+    pdf._set_font("", 9.5)
+    pdf.set_text_color(190, 215, 255)
+    pdf.cell(w=100, h=6, txt="Relatório de Cargos Selecionados", align="L", ln=1)
+    
+    pdf.set_x(pdf.MARGIN_X)
+    pdf._set_font("I", 7.5)
+    pdf.set_text_color(150, 185, 230)
+    pdf.cell(w=100, h=5, txt="Prefeitura Municipal de Miracema", align="L", ln=1)
+    
+    # Área central de resumo da seleção
+    pdf.set_xy(0, 70)
+    pdf._set_font("", 8)
+    pdf.set_text_color(*CINZA_400)
+    pdf.cell(w=pdf.PAGE_W, h=6, txt="SELEÇÃO PERSONALIZADA DE CARGOS", align="C", ln=1)
+    
+    pdf.ln(3)
+    pdf._set_font("B", 20)
+    pdf.set_text_color(*AZUL_INST)
+    pdf.cell(w=pdf.PAGE_W, h=10, txt=f"{len(cargos_detalhados)} Cargos Selecionados", align="C", ln=1)
+    
+    # Card Resumo Geral da Seleção
+    total_prev = sum(item['cargo'].get('total_previstos', 0) or 0 for item in cargos_detalhados)
+    total_ocup = sum(item['cargo'].get('total_ocupados', 0) or 0 for item in cargos_detalhados)
+    
+    card_w = pdf.CONTENT_W - 20
+    card_x = pdf.MARGIN_X + 10
+    card_y = 110
+    
+    pdf.set_fill_color(*BRANCO)
+    pdf.set_draw_color(*CINZA_200)
+    pdf.set_line_width(0.3)
+    pdf.rect(card_x, card_y, card_w, 40, style="FD")
+    pdf.set_fill_color(*AZUL_MEDIO)
+    pdf.rect(card_x, card_y, card_w, 3, style="F")
+    
+    col_w = card_w / 3
+    metrics = [
+        ("CARGOS SELECIONADOS", str(len(cargos_detalhados)), CINZA_500, AZUL_INST),
+        ("TOTAL VAGAS PREVISTAS", str(total_prev), CINZA_500, CINZA_900),
+        ("TOTAL VAGAS OCUPADAS", str(total_ocup), CINZA_500, CINZA_900),
+    ]
+    for i, (lbl, val, lbl_col, val_col) in enumerate(metrics):
+        cx = card_x + i * col_w
+        pdf.set_xy(cx, card_y + 8)
+        pdf._set_font("", 7)
+        pdf.set_text_color(*lbl_col)
+        pdf.cell(w=col_w, h=4, txt=lbl, align="C", ln=1)
+        pdf.set_x(cx)
+        pdf._set_font("B", 18)
+        pdf.set_text_color(*val_col)
+        pdf.cell(w=col_w, h=12, txt=val, align="C", ln=1)
+    
+    # Rodapé da Capa
+    pdf.set_fill_color(*AZUL_INST)
+    pdf.rect(x=0, y=PAGE_H - 18, w=pdf.PAGE_W, h=18, style="F")
+    pdf.set_fill_color(*DOURADO)
+    pdf.rect(x=0, y=PAGE_H - 18, w=pdf.PAGE_W, h=0.8, style="F")
+    pdf.set_xy(pdf.MARGIN_X, PAGE_H - 13)
+    pdf._set_font("", 7.5)
+    pdf.set_text_color(180, 210, 255)
+    agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+    pdf.cell(w=0, h=5, txt=f"Documento gerado em {agora} · Relatório Customizado · PMM", align="C", ln=0)
+    
+    # Renderiza cada cargo iniciando estritamente em uma nova página (quebra por cargo)
+    for item in cargos_detalhados:
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=25)
+        pdf._pagina_conteudo(
+            item['cargo'],
+            item.get('leis', []),
+            item.get('fontes', []),
+            item.get('ocupantes', [])
+        )
+        
+    pdf.set_title("Relatório FOPAG — Cargos Selecionados")
+    pdf.set_author("FOPAG — Prefeitura Municipal de Miracema")
+    return bytes(pdf.output(dest="S"))
+

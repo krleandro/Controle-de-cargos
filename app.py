@@ -5,7 +5,7 @@ from datetime import datetime
 from flask import Flask, request, jsonify, send_file, render_template, abort, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from relatorio_pdf import gerar_relatorio, gerar_relatorio_consolidado, gerar_relatorio_comissionados_secretaria
+from relatorio_pdf import gerar_relatorio, gerar_relatorio_consolidado, gerar_relatorio_comissionados_secretaria, gerar_relatorio_cargos_selecionados
 
 # ── Caminhos ──────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent
@@ -1176,6 +1176,64 @@ def exonerar_ocupante_com_historico(ocupante_id):
         return jsonify({"mensagem": "Ocupante exonerado com sucesso e registrado no histórico."})
     finally:
         con.close()
+
+
+@app.route("/api/relatorios/cargos_selecionados", methods=["POST"])
+def relatorio_cargos_selecionados():
+    """Gera o PDF consolidado para uma lista selecionada de IDs de cargos."""
+    dados = request.get_json() or {}
+    cargo_ids = dados.get("cargo_ids", [])
+    
+    if not cargo_ids or not isinstance(cargo_ids, list):
+        abort(400, description="Informe uma lista válida de cargo_ids para gerar o relatório.")
+        
+    con = get_db_connection()
+    try:
+        cargos_detalhados = []
+        for cargo_id in cargo_ids:
+            try:
+                cargo_id_int = int(cargo_id)
+            except (ValueError, TypeError):
+                continue
+                
+            r_cargo = con.execute("SELECT * FROM Cargos WHERE id = ?", (cargo_id_int,)).fetchone()
+            if not r_cargo:
+                continue
+            cargo_dict = dict(r_cargo)
+            
+            # Leis
+            r_leis = con.execute("SELECT * FROM LeisPertinentes WHERE cargo_id = ?", (cargo_id_int,)).fetchall()
+            leis = [dict(row) for row in r_leis]
+            
+            # Fontes
+            r_fontes = con.execute("SELECT * FROM FontesCargaHoraria WHERE cargo_id = ?", (cargo_id_int,)).fetchall()
+            fontes = [dict(row) for row in r_fontes]
+            
+            # Ocupantes
+            r_ocupantes = con.execute("SELECT * FROM Ocupantes WHERE cargo_id = ?", (cargo_id_int,)).fetchall()
+            ocupantes = [dict(row) for row in r_ocupantes]
+            
+            cargos_detalhados.append({
+                "cargo": cargo_dict,
+                "leis": leis,
+                "fontes": fontes,
+                "ocupantes": ocupantes
+            })
+            
+        if not cargos_detalhados:
+            abort(404, description="Nenhum cargo válido encontrado para os IDs selecionados.")
+            
+        pdf_bytes = gerar_relatorio_cargos_selecionados(cargos_detalhados)
+        import io
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="Relatorio_Cargos_Selecionados_PMM.pdf"
+        )
+    finally:
+        con.close()
+
 
 
 @app.route("/api/ocupantes/historico", methods=["GET"])

@@ -1419,7 +1419,7 @@
       </div>
 
       <!-- Tabela de Alertas e Inconsistências -->
-      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden;">
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 25px;">
         <div style="padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
           <h3 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
             <span>⚠️</span> Detalhe de Cargos com Saldo Crítico
@@ -1443,6 +1443,49 @@
               <!-- Gerado via Javascript -->
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Painel de Seleção Personalizada de Cargos para Relatório PDF -->
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 24px; margin-bottom: 25px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0 0 4px; display: flex; align-items: center; gap: 8px;">
+              <span>📋</span> Relatório Personalizado por Seleção de Cargos (PDF)
+            </h3>
+            <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">Selecione os cargos desejados. O arquivo PDF gerado conterá uma quebra de página por cargo selecionado.</p>
+          </div>
+          
+          <button class="btn-primary" onclick="gerarPDFCargosSelecionados()" style="background: linear-gradient(135deg, var(--blue-primary), #2563eb); border: none; font-weight: 600; padding: 10px 20px; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md); color:#fff; cursor:pointer;">
+            <span>📄</span> Gerar PDF dos Cargos Selecionados
+          </button>
+        </div>
+
+        <!-- Filtros da Seleção -->
+        <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; background: #f8fafc; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-md);">
+          <div style="flex: 1; min-width: 220px;">
+            <input type="text" id="sel-cargo-search" oninput="filtrarListaCargosSelecaoRelatorio()" placeholder="🔍 Pesquisar cargo por nome, código FOPAG ou secretaria..." style="width: 100%; padding: 8.5px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12.5px; outline: none; background: #ffffff;">
+          </div>
+          <div style="width: 180px;">
+            <select id="sel-cargo-tipo" onchange="filtrarListaCargosSelecaoRelatorio()" style="width: 100%; padding: 8.5px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12.5px; background: #ffffff; cursor: pointer; outline: none;">
+              <option value="Todos">Todos os Provimentos</option>
+              <option value="Comissão">Comissão</option>
+              <option value="Efetivo">Efetivo</option>
+              <option value="Eletivo">Eletivo</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" class="btn-outline" onclick="selecionarTodosCargosRelatorio(true)" style="font-size: 12px; padding: 7px 12px; background: #ffffff; cursor: pointer;">☑️ Selecionar Todos</button>
+            <button type="button" class="btn-outline" onclick="selecionarTodosCargosRelatorio(false)" style="font-size: 12px; padding: 7px 12px; background: #ffffff; cursor: pointer;">☐ Desmarcar Todos</button>
+          </div>
+          <div style="margin-left: auto;">
+            <span id="sel-cargos-count-badge" style="font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; background: var(--bg-xlightblue); color: var(--blue-primary); border: 1px solid var(--blue-light);">0 cargos selecionados</span>
+          </div>
+        </div>
+
+        <!-- Checklist de Cargos Rolável -->
+        <div id="sel-cargos-list-container" style="max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); background: #ffffff; padding: 8px 12px;">
+          <div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">Carregando cargos...</div>
         </div>
       </div>
     </div>
@@ -3233,6 +3276,161 @@ async function carregarRelatoriosDashboard() {
         `;
       }).join('');
     }
+    
+    // 5. Lista de seleção personalizada de cargos
+    renderizarListaSelecaoCargos();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+// ── Seleção Personalizada de Cargos para Relatório PDF ────────────────────────
+let todosCargosSelecaoRelatorio = [];
+let cargosSelecionadosIds = new Set();
+
+function renderizarListaSelecaoCargos() {
+  const container = $('sel-cargos-list-container');
+  if (!container) return;
+  
+  if (!todosCargosSelecaoRelatorio || todosCargosSelecaoRelatorio.length === 0) {
+    todosCargosSelecaoRelatorio = state.cargos || [];
+  }
+  
+  filtrarListaCargosSelecaoRelatorio();
+}
+
+function filtrarListaCargosSelecaoRelatorio() {
+  const container = $('sel-cargos-list-container');
+  if (!container) return;
+  
+  const termo = ($('sel-cargo-search') ? $('sel-cargo-search').value : '').toLowerCase().trim();
+  const tipoFiltro = $('sel-cargo-tipo') ? $('sel-cargo-tipo').value : 'Todos';
+
+  const cargosFiltrados = (state.cargos || []).filter(c => {
+    if (tipoFiltro !== 'Todos' && c.tipo_provimento !== tipoFiltro) return false;
+    if (!termo) return true;
+    const nome = (c.nome || '').toLowerCase();
+    const cod = (c.codigo_fopag || '').toLowerCase();
+    const sec = (c.secretaria || '').toLowerCase();
+    return nome.includes(termo) || cod.includes(termo) || sec.includes(termo);
+  });
+
+  if (cargosFiltrados.length === 0) {
+    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 12.5px; padding: 24px;">Nenhum cargo encontrado para os filtros aplicados.</div>`;
+    atualizarContadorCargosSelecionados();
+    return;
+  }
+
+  container.innerHTML = cargosFiltrados.map(c => {
+    const isChecked = cargosSelecionadosIds.has(c.id) ? 'checked' : '';
+    const badgeProv = c.tipo_provimento === 'Comissão' ? 'background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;' : 'background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;';
+    const secText = c.secretaria ? ` · ${c.secretaria}` : '';
+    const prev = c.total_previstos || 0;
+    const ocup = c.total_ocupados || 0;
+    const saldo = c.saldo_vagas !== undefined ? c.saldo_vagas : (prev - ocup);
+    const saldoColor = saldo < 0 ? 'var(--danger-text)' : saldo === 0 ? 'var(--warning-text)' : 'var(--success-text)';
+
+    return `
+      <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--slate-100); cursor: pointer; border-radius: var(--radius-sm); transition: background 0.15s;" onmouseover="this.style.background='var(--slate-50)'" onmouseout="this.style.background='transparent'">
+        <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+          <input type="checkbox" value="${c.id}" ${isChecked} onchange="toggleCargoSelecaoRelatorio(${c.id}, this.checked)" style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--blue-primary);">
+          <div style="min-width: 0; flex: 1;">
+            <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${c.nome}</div>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+              <span style="padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; ${badgeProv}">${c.tipo_provimento}</span>
+              ${secText}
+            </div>
+          </div>
+        </div>
+        <div style="font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-left: 16px; white-space: nowrap; text-align: right;">
+          Prev: ${prev} | Ocup: ${ocup} | <span style="color: ${saldoColor}">Saldo: ${saldo >= 0 ? '+' : ''}${saldo}</span>
+        </div>
+      </label>
+    `;
+  }).join('');
+
+  atualizarContadorCargosSelecionados();
+}
+
+function toggleCargoSelecaoRelatorio(id, checked) {
+  if (checked) {
+    cargosSelecionadosIds.add(id);
+  } else {
+    cargosSelecionadosIds.delete(id);
+  }
+  atualizarContadorCargosSelecionados();
+}
+
+function selecionarTodosCargosRelatorio(status) {
+  const termo = ($('sel-cargo-search') ? $('sel-cargo-search').value : '').toLowerCase().trim();
+  const tipoFiltro = $('sel-cargo-tipo') ? $('sel-cargo-tipo').value : 'Todos';
+
+  const cargosFiltrados = (state.cargos || []).filter(c => {
+    if (tipoFiltro !== 'Todos' && c.tipo_provimento !== tipoFiltro) return false;
+    if (!termo) return true;
+    const nome = (c.nome || '').toLowerCase();
+    const cod = (c.codigo_fopag || '').toLowerCase();
+    const sec = (c.secretaria || '').toLowerCase();
+    return nome.includes(termo) || cod.includes(termo) || sec.includes(termo);
+  });
+
+  cargosFiltrados.forEach(c => {
+    if (status) {
+      cargosSelecionadosIds.add(c.id);
+    } else {
+      cargosSelecionadosIds.delete(c.id);
+    }
+  });
+
+  filtrarListaCargosSelecaoRelatorio();
+}
+
+function atualizarContadorCargosSelecionados() {
+  const badge = $('sel-cargos-count-badge');
+  if (badge) {
+    const qtd = cargosSelecionadosIds.size;
+    badge.textContent = `${qtd} cargo${qtd !== 1 ? 's' : ''} selecionado${qtd !== 1 ? 's' : ''}`;
+  }
+}
+
+async function gerarPDFCargosSelecionados() {
+  const cargoIds = Array.from(cargosSelecionadosIds);
+  if (cargoIds.length === 0) {
+    toast('Selecione pelo menos um cargo para gerar o relatório PDF.', 'err');
+    return;
+  }
+
+  try {
+    toast(`Gerando PDF de ${cargoIds.length} cargo(s) selecionado(s)...`, 'ok');
+    const r = await fetch('/api/relatorios/cargos_selecionados', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cargo_ids: cargoIds })
+    });
+
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || 'Erro ao gerar relatório de cargos selecionados.');
+    }
+
+    const blob = await r.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    let fname = `Relatorio_Cargos_Selecionados_${cargoIds.length}_cargos.pdf`;
+    const disp = r.headers.get('content-disposition');
+    if (disp) {
+      const m = disp.match(/filename\*?=(?:UTF-8'')?"?([^"]+)"?/);
+      if (m) fname = decodeURIComponent(m[1]);
+    }
+
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    toast('Relatório em PDF gerado com sucesso!', 'ok');
   } catch (e) {
     toast(e.message, 'err');
   }

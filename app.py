@@ -871,12 +871,56 @@ def relatorios_consolidado():
     )
 
 
-@app.route("/api/relatorios/comissionados_secretaria", methods=["GET"])
+@app.route("/api/relatorios/comissionados_secretaria", methods=["GET", "POST"])
 def relatorios_comissionados_secretaria():
     con = get_db_connection()
     try:
+        dados = request.get_json() if request.method == "POST" and request.is_json else request.args
+        
+        simbolos = dados.get("simbolos") or []
+        if isinstance(simbolos, str):
+            simbolos = [s.strip() for s in simbolos.split(",") if s.strip()]
+            
+        situacao_vaga = (dados.get("situacao_vaga") or "ambos").strip().lower()
+        recrutamento = (dados.get("recrutamento") or "todos").strip().lower()
+
+        # Construção das cláusulas SQL dinâmicas
+        where_clauses = ["tipo_provimento IN ('Comissão', 'Comissao', 'Eletivo')"]
+        params = []
+
+        # 1. Filtro de Símbolos
+        if simbolos and "TODOS" not in [s.upper() for s in simbolos]:
+            simb_conditions = []
+            for s in simbolos:
+                s_clean = s.strip().upper()
+                if s_clean in ("SEM SÍMBOLO", "SEM SIMBOLO", "NULO", "NONE", "NULL"):
+                    simb_conditions.append("(simbolo_vencimento IS NULL OR TRIM(simbolo_vencimento) = '')")
+                else:
+                    simb_conditions.append("UPPER(TRIM(simbolo_vencimento)) = ?")
+                    params.append(s_clean)
+            if simb_conditions:
+                where_clauses.append(f"({' OR '.join(simb_conditions)})")
+
+        # 2. Filtro de Recrutamento
+        if recrutamento == "amplo":
+            where_clauses.append("LOWER(COALESCE(recrutamento, '')) LIKE '%amplo%'")
+        elif recrutamento == "limitado":
+            where_clauses.append("LOWER(COALESCE(recrutamento, '')) LIKE '%limitado%'")
+
+        # 3. Filtro de Ocupação / Situação de Vaga
+        if situacao_vaga == "ocupado":
+            where_clauses.append("total_ocupados > 0")
+        elif situacao_vaga in ("vago_todos", "vago"):
+            where_clauses.append("total_ocupados = 0")
+        elif situacao_vaga == "vago_com_historico":
+            where_clauses.append("total_ocupados = 0 AND id IN (SELECT DISTINCT cargo_id FROM HistoricoExoneracoes WHERE cargo_id IS NOT NULL)")
+        elif situacao_vaga in ("vago_sem_historico", "so_vago"):
+            where_clauses.append("total_ocupados = 0 AND id NOT IN (SELECT DISTINCT cargo_id FROM HistoricoExoneracoes WHERE cargo_id IS NOT NULL)")
+
+        where_sql = " AND ".join(where_clauses)
+
         # 1. Stats
-        res_stats = con.execute("""
+        res_stats = con.execute(f"""
             SELECT
               COUNT(*)                                           AS total_cargos,
               COALESCE(SUM(total_previstos), 0)                 AS total_previstos,
@@ -884,12 +928,12 @@ def relatorios_comissionados_secretaria():
               COALESCE(SUM(saldo_vagas), 0)                     AS total_saldo,
               COALESCE(SUM(CASE WHEN saldo_vagas < 0 THEN 1 ELSE 0 END), 0)  AS alertas
             FROM vw_SaldoVagas
-            WHERE tipo_provimento IN ('Comissão', 'Comissao', 'Eletivo')
-        """).fetchone()
+            WHERE {where_sql}
+        """, params).fetchone()
         stats = dict(res_stats)
 
         # 2. Secretarias summary
-        res_secs = con.execute("""
+        res_secs = con.execute(f"""
             SELECT
               COALESCE(NULLIF(secretaria, ''), 'Não Informada')  AS secretaria,
               COUNT(*)                                           AS cargos_count,
@@ -897,27 +941,30 @@ def relatorios_comissionados_secretaria():
               COALESCE(SUM(total_ocupados), 0)                  AS vagas_ocupadas,
               COALESCE(SUM(saldo_vagas), 0)                     AS saldo
             FROM vw_SaldoVagas
-            WHERE tipo_provimento IN ('Comissão', 'Comissao', 'Eletivo')
+            WHERE {where_sql}
             GROUP BY secretaria
             ORDER BY secretaria COLLATE NOCASE
-        """).fetchall()
+        """, params).fetchall()
         secretarias_summary = [dict(s) for s in res_secs]
 
         # 3. Ocupantes grouped
-        res_ocup = con.execute("SELECT id, cargo_id, nome, matricula, portaria FROM Ocupantes ORDER BY nome").fetchall()
+        res_ocup = con.execute("SELECT id, cargo_id, nome, matricula, portaria, data_nomeacao FROM Ocupantes ORDER BY nome").fetchall()
         ocupantes_by_cargo = {}
         for o in res_ocup:
             o_dict = dict(o)
             ocupantes_by_cargo.setdefault(o_dict["cargo_id"], []).append(o_dict)
 
-        # 4. Cargos by Sec
-        res_cargos = con.execute("""
+        # 4. Cargos por Secretaria
+        res_cargos = con.execute(f"""
             SELECT id, nome, COALESCE(NULLIF(secretaria, ''), 'Não Informada') AS sec_name,
                    total_previstos, total_ocupados, saldo_vagas, simbolo_vencimento, recrutamento
             FROM vw_SaldoVagas
-            WHERE tipo_provimento IN ('Comissão', 'Comissao', 'Eletivo')
+            WHERE {where_sql}
             ORDER BY sec_name COLLATE NOCASE, nome COLLATE NOCASE
-        """).fetchall()
+        """, params).fetchall()
+
+        if not res_cargos:
+            abort(404, description="Nenhum cargo comissionado atende aos parâmetros de filtro selecionados.")
 
         cargos_by_sec = {}
         for c in res_cargos:
@@ -926,12 +973,37 @@ def relatorios_comissionados_secretaria():
             sec = c_dict["sec_name"]
             cargos_by_sec.setdefault(sec, []).append(c_dict)
 
+        # Texto descritivo dos filtros para exibir na capa
+        filtros_partes = []
+        if simbolos and "TODOS" not in [s.upper() for s in simbolos]:
+            filtros_partes.append(f"Símbolos: {', '.join(simbolos)}")
+        else:
+            filtros_partes.append("Símbolos: Todos")
+            
+        sit_map = {
+            "ambos": "Ocupação: Ocupados e Vagos",
+            "ocupado": "Ocupação: Somente Ocupados",
+            "vago_todos": "Ocupação: Todos os Vagos",
+            "vago_com_historico": "Ocupação: Vagos com Histórico de Exoneração",
+            "vago_sem_historico": "Ocupação: Só Vagos (Sem Histórico)"
+        }
+        filtros_partes.append(sit_map.get(situacao_vaga, "Ocupação: Todos"))
+        
+        rec_map = {
+            "todos": "Recrutamento: Todos",
+            "amplo": "Recrutamento: Amplo Acesso",
+            "limitado": "Recrutamento: Limitado a Servidores de Carreira"
+        }
+        filtros_partes.append(rec_map.get(recrutamento, "Recrutamento: Todos"))
+        
+        filtros_txt = " | ".join(filtros_partes)
+
     finally:
         con.close()
 
     import io
     try:
-        pdf_bytes = gerar_relatorio_comissionados_secretaria(stats, secretarias_summary, cargos_by_sec)
+        pdf_bytes = gerar_relatorio_comissionados_secretaria(stats, secretarias_summary, cargos_by_sec, filtros_txt=filtros_txt)
     except Exception as e:
         abort(500, description=f"Erro ao gerar PDF por Secretaria: {e}")
 

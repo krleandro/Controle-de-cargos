@@ -1264,7 +1264,7 @@
             <span id="c-ocupantes-count" style="font-size: 11px; font-weight: 700; background: var(--bg-xlightblue); color: var(--blue-primary); padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid var(--blue-light);">0 ocupantes</span>
           </div>
           <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <button class="btn-primary" onclick="confirmarBaixarRelatorioSecretaria()" style="background: linear-gradient(135deg, #0f766e, #0d9488); border: none; font-weight: 600; padding: 8px 16px; font-size: 12.5px; height: 38px; display: flex; align-items: center; gap: 6px; border-radius: var(--radius-md); color:#fff; cursor:pointer;" title="Exportar Relatório por Secretaria em PDF">
+            <button class="btn-primary" onclick="abrirModalFiltroComissionadosSecretaria()" style="background: linear-gradient(135deg, #0f766e, #0d9488); border: none; font-weight: 600; padding: 8px 16px; font-size: 12.5px; height: 38px; display: flex; align-items: center; gap: 6px; border-radius: var(--radius-md); color:#fff; cursor:pointer;" title="Exportar Relatório por Secretaria em PDF">
               <span>🏢</span> PDF por Secretaria
             </button>
             <button class="btn-outline" onclick="abrirModalHistoricoExoneracoes()" style="border: 1px solid var(--border); background: var(--bg-card); font-weight: 600; padding: 8px 16px; font-size: 12.5px; height: 38px; display: flex; align-items: center; gap: 6px; border-radius: var(--radius-md); color:var(--text-primary); cursor:pointer;" title="Visualizar histórico de servidores exonerados">
@@ -1352,7 +1352,7 @@
     <div id="relatorios-wrap" style="display: none; margin: 24px 32px 0; animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);">
       <!-- Botões de exportação principal no topo -->
       <div style="display: flex; justify-content: flex-end; gap: 16px; margin-bottom: 20px;">
-        <button class="btn-primary" onclick="confirmarBaixarRelatorioSecretaria()" style="background: linear-gradient(135deg, #0f766e, #0d9488); border: none; font-weight: 600; padding: 12px 24px; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md); color:#fff; cursor:pointer;">
+        <button class="btn-primary" onclick="abrirModalFiltroComissionadosSecretaria()" style="background: linear-gradient(135deg, #0f766e, #0d9488); border: none; font-weight: 600; padding: 12px 24px; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md); color:#fff; cursor:pointer;">
           <span>🏢</span> Exportar Relatório por Secretaria (PDF)
         </button>
         <button class="btn-primary" onclick="abrirModalFiltroRelatorio()" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: none; font-weight: 600; padding: 12px 24px; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px; border-radius: var(--radius-md); color:#fff; cursor:pointer;">
@@ -1696,6 +1696,88 @@
     <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:18px;">
       <button class="btn-ghost" onclick="fecharModalFiltroRelatorio()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:1px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;">Cancelar</button>
       <button class="btn-primary" onclick="confirmarBaixarRelatorioConsolidado()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:none; background:linear-gradient(135deg, var(--blue-primary), #3b82f6); color:#fff; cursor:pointer; box-shadow:var(--shadow-md);">Gerar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: PARÂMETROS DO RELATÓRIO POR SECRETARIA ────────────────────────── -->
+<div class="overlay" id="overlay-filtro-comissionados-secretaria" onclick="if(event.target===this)fecharModalFiltroComissionadosSecretaria()">
+  <div class="modal" style="width: 520px; max-width: 92vw;">
+    <div class="modal-header">
+      <div>
+        <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+          <span>🏢</span> Parâmetros do Relatório por Secretaria
+        </h2>
+        <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Filtre os cargos comissionados que comporão o relatório PDF</p>
+      </div>
+      <button class="close-btn" onclick="fecharModalFiltroComissionadosSecretaria()">×</button>
+    </div>
+    
+    <!-- 1. Símbolos de Vencimento -->
+    <div class="form-group" style="margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <label style="font-weight: 700; color: var(--text-primary); font-size: 12.5px;">Símbolos de Vencimento</label>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="btn-outline" onclick="selecionarTodosSimbolosFiltroSecretaria(true)" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #fff; cursor: pointer;">☑️ Marcar Todos</button>
+          <button type="button" class="btn-outline" onclick="selecionarTodosSimbolosFiltroSecretaria(false)" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #fff; cursor: pointer;">☐ Desmarcar Todos</button>
+        </div>
+      </div>
+      <div id="fs-simbolos-container" style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); background: #f8fafc; padding: 10px 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px;">
+        <!-- Gerado via Javascript dinamicamente -->
+      </div>
+    </div>
+
+    <!-- 2. Situação de Vaga / Ocupação -->
+    <div class="form-group" style="margin-bottom: 20px;">
+      <label style="font-weight: 700; color: var(--text-primary); font-size: 12.5px; display: block; margin-bottom: 8px;">Situação de Vaga / Ocupação</label>
+      <div style="display: flex; flex-direction: column; gap: 8px; background: #f8fafc; border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-md);">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
+          <input type="radio" name="fs-situacao-vaga" value="ambos" checked style="accent-color: var(--blue-primary); cursor: pointer;">
+          <strong>Ambos</strong> (Ocupados e Vagos)
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
+          <input type="radio" name="fs-situacao-vaga" value="ocupado" style="accent-color: var(--blue-primary); cursor: pointer;">
+          <strong>Somente Ocupados</strong> (Cargos com servidores atuais)
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
+          <input type="radio" name="fs-situacao-vaga" value="vago_com_historico" style="accent-color: var(--blue-primary); cursor: pointer;">
+          <strong>Vagos com Histórico</strong> (Já tiveram exoneração cadastrada)
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
+          <input type="radio" name="fs-situacao-vaga" value="vago_sem_historico" style="accent-color: var(--blue-primary); cursor: pointer;">
+          <strong>Só Vago / Sem Histórico</strong> (Nunca ocupados / Sem exonerações prévias)
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
+          <input type="radio" name="fs-situacao-vaga" value="vago_todos" style="accent-color: var(--blue-primary); cursor: pointer;">
+          <strong>Todos os Vagos</strong> (Com e sem histórico)
+        </label>
+      </div>
+    </div>
+
+    <!-- 3. Tipo de Recrutamento -->
+    <div class="form-group" style="margin-bottom: 24px;">
+      <label style="font-weight: 700; color: var(--text-primary); font-size: 12.5px; display: block; margin-bottom: 8px;">Tipo de Recrutamento</label>
+      <div style="display: flex; gap: 16px; background: #f8fafc; border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-md); flex-wrap: wrap;">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
+          <input type="radio" name="fs-recrutamento" value="todos" checked style="accent-color: var(--blue-primary); cursor: pointer;">
+          Todos
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
+          <input type="radio" name="fs-recrutamento" value="amplo" style="accent-color: var(--blue-primary); cursor: pointer;">
+          Amplo Acesso
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
+          <input type="radio" name="fs-recrutamento" value="limitado" style="accent-color: var(--blue-primary); cursor: pointer;">
+          Limitado (Servidores de Carreira)
+        </label>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid var(--border); padding-top:18px;">
+      <button class="btn-ghost" onclick="fecharModalFiltroComissionadosSecretaria()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:1px solid var(--border); background:transparent; color:var(--text-secondary); cursor:pointer;">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarBaixarRelatorioSecretaria()" style="padding:10px 20px; font-weight:600; border-radius:var(--radius-md); border:none; background:linear-gradient(135deg, #0f766e, #0d9488); color:#fff; cursor:pointer; box-shadow:var(--shadow-md); display: flex; align-items: center; gap: 6px;">
+        <span>📄</span> Gerar PDF por Secretaria
+      </button>
     </div>
   </div>
 </div>
@@ -4151,18 +4233,108 @@ async function submitOcupante() {
   }
 }
 
+function abrirModalFiltroComissionadosSecretaria() {
+  const container = $('fs-simbolos-container');
+  if (container) {
+    const simbolosSet = new Set();
+    let temSemSimbolo = false;
+
+    (state.cargos || []).forEach(c => {
+      const prov = (c.tipo_provimento || '').toLowerCase();
+      if (prov.includes('comis') || prov.includes('comissão') || prov.includes('eletiv')) {
+        const s = (c.simbolo_vencimento || '').trim();
+        if (s) {
+          simbolosSet.add(s);
+        } else {
+          temSemSimbolo = true;
+        }
+      }
+    });
+
+    const simbolos = Array.from(simbolosSet).sort();
+    if (temSemSimbolo) {
+      simbolos.push("Sem Símbolo");
+    }
+
+    if (simbolos.length === 0) {
+      ['CC1', 'CC2', 'CC3', 'CC4', 'CC5', 'CC6', 'CC7', 'CC8', 'FG1', 'FG2'].forEach(s => simbolosSet.add(s));
+      Array.from(simbolosSet).sort().forEach(s => simbolos.push(s));
+    }
+
+    container.innerHTML = simbolos.map(s => `
+      <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text-primary); cursor: pointer;">
+        <input type="checkbox" class="fs-simbolo-checkbox" value="${s}" checked style="accent-color: var(--blue-primary); cursor: pointer;">
+        ${s}
+      </label>
+    `).join('');
+  }
+
+  const radSit = document.querySelector('input[name="fs-situacao-vaga"][value="ambos"]');
+  if (radSit) radSit.checked = true;
+
+  const radRec = document.querySelector('input[name="fs-recrutamento"][value="todos"]');
+  if (radRec) radRec.checked = true;
+
+  document.getElementById('overlay-filtro-comissionados-secretaria').classList.add('show');
+}
+
+function fecharModalFiltroComissionadosSecretaria() {
+  document.getElementById('overlay-filtro-comissionados-secretaria').classList.remove('show');
+}
+
+function selecionarTodosSimbolosFiltroSecretaria(status) {
+  const checkboxes = document.querySelectorAll('.fs-simbolo-checkbox');
+  checkboxes.forEach(cb => cb.checked = status);
+}
+
 async function confirmarBaixarRelatorioSecretaria() {
+  const checkboxes = document.querySelectorAll('.fs-simbolo-checkbox:checked');
+  const simbolos = Array.from(checkboxes).map(cb => cb.value);
+
+  const radSit = document.querySelector('input[name="fs-situacao-vaga"]:checked');
+  const situacaoVaga = radSit ? radSit.value : 'ambos';
+
+  const radRec = document.querySelector('input[name="fs-recrutamento"]:checked');
+  const recrutamento = radRec ? radRec.value : 'todos';
+
+  if (simbolos.length === 0) {
+    toast('Selecione ao menos um símbolo de vencimento para gerar o relatório.', 'err');
+    return;
+  }
+
+  fecharModalFiltroComissionadosSecretaria();
+
   try {
-    toast('Gerando PDF por secretaria, por favor aguarde...', 'ok');
-    const urlQuery = '/api/relatorios/comissionados_secretaria';
-    const r = await fetch(urlQuery);
-    if (!r.ok) throw new Error('Erro ao baixar relatório por secretaria');
+    toast('Gerando relatório por secretaria com os parâmetros selecionados...', 'ok');
+
+    const r = await fetch('/api/relatorios/comissionados_secretaria', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        simbolos: simbolos,
+        situacao_vaga: situacaoVaga,
+        recrutamento: recrutamento
+      })
+    });
+
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.description || err.detail || 'Erro ao gerar relatório por secretaria.');
+    }
+
     const blob = await r.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const data = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    a.download = `Relatorio_Comissionados_Secretaria_FOPAG_${data}.pdf`;
+
+    let fname = `Relatorio_Comissionados_Secretaria_FOPAG_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.pdf`;
+    const disp = r.headers.get('content-disposition');
+    if (disp) {
+      const m = disp.match(/filename\*?=(?:UTF-8'')?"?([^"]+)"?/);
+      if (m) fname = decodeURIComponent(m[1]);
+    }
+
+    a.download = fname;
     document.body.appendChild(a);
     a.click();
     a.remove();

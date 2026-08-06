@@ -1375,8 +1375,136 @@ class RelatorioComissionadosSecretariaPDF(FPDF):
         self.cell(w=0, h=h - 2.4, txt=title.upper(), ln=1)
         self.ln(2)
 
-    def _capa(self, stats: dict):
-        """Renderiza a página de capa institucional do relatório gerencial por secretaria."""
+    def _pagina_resumo_secretarias(self, secretarias_summary: List[dict]):
+        """Desenha a tabela de visão geral por secretaria."""
+        self.add_page()
+        self.set_y(self.t_margin)
+        self.set_auto_page_break(auto=True, margin=25)
+
+        self._section_title("Visão Geral por Secretaria")
+        self.ln(2)
+
+        heading_face = FontFace(
+            emphasis="B",
+            color=BRANCO,
+            fill_color=AZUL_INST,
+        )
+
+        with self.table(
+            col_widths=(65, 25, 25, 25, 30),
+            text_align=("LEFT", "CENTER", "CENTER", "CENTER", "CENTER"),
+            headings_style=heading_face,
+            borders_layout=TableBordersLayout.ALL,
+        ) as table:
+            table.row(["Secretaria", "Cargos", "Previstas", "Ocupadas", "Saldo Vagas"])
+            for i, s in enumerate(secretarias_summary):
+                bg = CINZA_50 if i % 2 == 0 else BRANCO
+                data_face = FontFace(fill_color=bg)
+                row = table.row()
+                row.cell(s.get("secretaria", "—"), style=data_face)
+                row.cell(str(s.get("cargos_count", 0)), style=data_face)
+                row.cell(str(s.get("vagas_previstas", 0)), style=data_face)
+                row.cell(str(s.get("vagas_ocupadas", 0)), style=data_face)
+                
+                saldo_val = s.get("saldo", 0)
+                saldo_str = f"{saldo_val:+d}"
+                saldo_color = VERMELHO_ESC if saldo_val < 0 else AZUL_INST
+                saldo_face = FontFace(color=saldo_color, fill_color=bg, emphasis="B")
+                row.cell(saldo_str, style=saldo_face)
+        self.ln(4)
+
+    def _pagina_cargos_por_secretaria(self, cargos_by_sec: dict):
+        """Renderiza cada secretaria com seus respectivos cargos comissionados."""
+        for sec_nome, cargos in cargos_by_sec.items():
+            self.add_page()
+            self.set_y(self.t_margin)
+            self.set_auto_page_break(auto=True, margin=25)
+
+            self._section_title(f"Secretaria: {sec_nome}")
+            self.ln(2)
+
+            for cargo in cargos:
+                # Prevenção de órfão se não couber o cargo
+                if self.get_y() > (self.h - 55):
+                    self.add_page()
+
+                # Card do cargo comissionado
+                c_y = self.get_y()
+                nome = cargo.get("nome", "—")
+                simb = cargo.get("simbolo_vencimento") or "—"
+                rec = cargo.get("recrutamento") or "—"
+                prev = cargo.get("total_previstos", 0)
+                ocup = cargo.get("total_ocupados", 0)
+                saldo = cargo.get("saldo_vagas", prev - ocup)
+
+                # Caixa visual do cargo
+                self.set_fill_color(*AZUL_SUAVE)
+                self.set_draw_color(*AZUL_MEDIO)
+                self.set_line_width(0.3)
+                self.rect(self.MARGIN_X, c_y, self.CONTENT_W, 8, style="FD")
+
+                self.set_xy(self.MARGIN_X + 4, c_y + 1.5)
+                self._set_font("B", 9)
+                self.set_text_color(*AZUL_INST)
+                self.cell(w=110, h=5, txt=nome, ln=0)
+
+                self._set_font("", 8)
+                self.set_text_color(*CINZA_700)
+                self.cell(w=0, h=5, txt=f"Símbolo: {simb}  ·  Recrutamento: {rec}", align="R", ln=1)
+
+                # Quantitativos
+                self.set_x(self.MARGIN_X)
+                self.set_fill_color(*CINZA_50)
+                self.set_draw_color(*CINZA_200)
+                self.rect(self.MARGIN_X, self.get_y(), self.CONTENT_W, 6, style="FD")
+
+                self.set_x(self.MARGIN_X + 4)
+                self._set_font("", 7.5)
+                self.set_text_color(*CINZA_600)
+                txt_q = f"Previstas: {prev}   |   Ocupadas: {ocup}   |   Saldo: {saldo:+d}"
+                self.cell(w=0, h=6, txt=txt_q, ln=1)
+
+                # Ocupantes do cargo comissionado
+                ocupantes = cargo.get("ocupantes", [])
+                if ocupantes:
+                    self.set_x(self.MARGIN_X)
+                    self._set_font("B", 7.5)
+                    self.set_text_color(*CINZA_700)
+                    self.cell(w=0, h=5, txt=" Servidor(es) Ocupante(s):", ln=1)
+
+                    heading_face = FontFace(color=CINZA_700, fill_color=CINZA_200, emphasis="B")
+                    with self.table(
+                        col_widths=(65, 30, 45, 30),
+                        text_align=("LEFT", "CENTER", "LEFT", "CENTER"),
+                        headings_style=heading_face,
+                        borders_layout=TableBordersLayout.ALL,
+                    ) as table:
+                        table.row(["Nome do Servidor", "Matrícula", "Portaria de Nomeação", "Data Nomeação"])
+                        for o_idx, o in enumerate(ocupantes):
+                            bg_row = CINZA_50 if o_idx % 2 == 0 else BRANCO
+                            d_face = FontFace(fill_color=bg_row)
+                            row = table.row()
+                            row.cell(o.get("nome", "—"), style=d_face)
+                            row.cell(o.get("matricula", "—"), style=d_face)
+                            row.cell(o.get("portaria", "—"), style=d_face)
+                            data_nom = o.get("data_nomeacao") or "—"
+                            if data_nom and len(data_nom) == 10 and data_nom[4] == '-' and data_nom[7] == '-':
+                                try:
+                                    dt = datetime.strptime(data_nom, "%Y-%m-%d")
+                                    data_nom = dt.strftime("%d/%m/%Y")
+                                except:
+                                    pass
+                            row.cell(data_nom, style=d_face)
+                else:
+                    self.set_x(self.MARGIN_X + 4)
+                    self._set_font("I", 7.5)
+                    self.set_text_color(*CINZA_400)
+                    self.cell(w=0, h=5, txt="Nenhum ocupante registrado (Cargo Vago)", ln=1)
+
+                self.ln(4)
+
+    def _capa(self, stats: dict, filtros_txt: str = None):
+        """Página de capa do relatório gerencial por secretaria."""
         self.add_page()
         self.set_auto_page_break(auto=False, margin=0)
         PAGE_H = 297
@@ -1481,10 +1609,10 @@ class RelatorioComissionadosSecretariaPDF(FPDF):
         alertas = stats.get("alertas", 0)
         taxa_ocup = (ocup / prev * 100) if prev > 0 else 0
 
-        self.set_xy(self.MARGIN_X, 185)
+        self.set_xy(self.MARGIN_X, 180)
         self.set_draw_color(*CINZA_200)
         self.set_line_width(0.15)
-        self.line(self.MARGIN_X, 182, self.PAGE_W - self.MARGIN_X, 182)
+        self.line(self.MARGIN_X, 177, self.PAGE_W - self.MARGIN_X, 177)
 
         self._set_font("", 8)
         self.set_text_color(*CINZA_500)
@@ -1631,9 +1759,9 @@ class RelatorioComissionadosSecretariaPDF(FPDF):
                 self.line(self.MARGIN_X, self.get_y(), self.PAGE_W - self.MARGIN_X, self.get_y())
                 self.ln(2.5)
 
-    def montar(self, stats: dict, secretarias_summary: List[dict], cargos_by_sec: dict):
+    def montar(self, stats: dict, secretarias_summary: List[dict], cargos_by_sec: dict, filtros_txt: str = None):
         """Monta o relatório gerencial completo por secretaria."""
-        self._capa(stats)
+        self._capa(stats, filtros_txt=filtros_txt)
         self._pagina_resumo_secretarias(secretarias_summary)
         self._pagina_cargos_por_secretaria(cargos_by_sec)
 
@@ -1643,10 +1771,10 @@ class RelatorioComissionadosSecretariaPDF(FPDF):
         self.set_creator("FOPAG v1.0")
 
 
-def gerar_relatorio_comissionados_secretaria(stats: dict, secretarias_summary: list, cargos_by_sec: dict) -> bytes:
+def gerar_relatorio_comissionados_secretaria(stats: dict, secretarias_summary: list, cargos_by_sec: dict, filtros_txt: str = None) -> bytes:
     """Gera o PDF gerencial por secretaria e retorna os bytes."""
     pdf = RelatorioComissionadosSecretariaPDF()
-    pdf.montar(stats, secretarias_summary, cargos_by_sec)
+    pdf.montar(stats, secretarias_summary, cargos_by_sec, filtros_txt=filtros_txt)
     return bytes(pdf.output(dest="S"))
 
 

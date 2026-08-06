@@ -1727,29 +1727,27 @@
       </div>
     </div>
 
-    <!-- 2. Situação de Vaga / Ocupação -->
+    <!-- 2. Situação de Vaga / Ocupação (Multi-seleção com Checkboxes) -->
     <div class="form-group" style="margin-bottom: 20px;">
-      <label style="font-weight: 700; color: var(--text-primary); font-size: 12.5px; display: block; margin-bottom: 8px;">Situação de Vaga / Ocupação</label>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <label style="font-weight: 700; color: var(--text-primary); font-size: 12.5px;">Situação de Vaga / Ocupação</label>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="btn-outline" onclick="selecionarTodasSituacoesFiltroSecretaria(true)" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #fff; cursor: pointer;">☑️ Marcar Todas</button>
+          <button type="button" class="btn-outline" onclick="selecionarTodasSituacoesFiltroSecretaria(false)" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #fff; cursor: pointer;">☐ Desmarcar Todas</button>
+        </div>
+      </div>
       <div style="display: flex; flex-direction: column; gap: 8px; background: #f8fafc; border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-md);">
         <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
-          <input type="radio" name="fs-situacao-vaga" value="ambos" checked style="accent-color: var(--blue-primary); cursor: pointer;">
-          <strong>Ambos</strong> (Ocupados e Vagos)
+          <input type="checkbox" class="fs-situacao-checkbox" value="ocupado" checked style="accent-color: var(--blue-primary); cursor: pointer;">
+          <strong>Cargos Ocupados</strong> (Com servidores ativos)
         </label>
         <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
-          <input type="radio" name="fs-situacao-vaga" value="ocupado" style="accent-color: var(--blue-primary); cursor: pointer;">
-          <strong>Somente Ocupados</strong> (Cargos com servidores atuais)
-        </label>
-        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
-          <input type="radio" name="fs-situacao-vaga" value="vago_com_historico" style="accent-color: var(--blue-primary); cursor: pointer;">
+          <input type="checkbox" class="fs-situacao-checkbox" value="vago_com_historico" checked style="accent-color: var(--blue-primary); cursor: pointer;">
           <strong>Vagos com Histórico</strong> (Já tiveram exoneração cadastrada)
         </label>
         <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
-          <input type="radio" name="fs-situacao-vaga" value="vago_sem_historico" style="accent-color: var(--blue-primary); cursor: pointer;">
+          <input type="checkbox" class="fs-situacao-checkbox" value="vago_sem_historico" checked style="accent-color: var(--blue-primary); cursor: pointer;">
           <strong>Só Vago / Sem Histórico</strong> (Nunca ocupados / Sem exonerações prévias)
-        </label>
-        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-primary); cursor: pointer;">
-          <input type="radio" name="fs-situacao-vaga" value="vago_todos" style="accent-color: var(--blue-primary); cursor: pointer;">
-          <strong>Todos os Vagos</strong> (Com e sem histórico)
         </label>
       </div>
     </div>
@@ -4269,8 +4267,9 @@ function abrirModalFiltroComissionadosSecretaria() {
     `).join('');
   }
 
-  const radSit = document.querySelector('input[name="fs-situacao-vaga"][value="ambos"]');
-  if (radSit) radSit.checked = true;
+  // Marca todos os checkboxes de situacao
+  const checkboxesSit = document.querySelectorAll('.fs-situacao-checkbox');
+  checkboxesSit.forEach(cb => cb.checked = true);
 
   const radRec = document.querySelector('input[name="fs-recrutamento"][value="todos"]');
   if (radRec) radRec.checked = true;
@@ -4287,18 +4286,28 @@ function selecionarTodosSimbolosFiltroSecretaria(status) {
   checkboxes.forEach(cb => cb.checked = status);
 }
 
-async function confirmarBaixarRelatorioSecretaria() {
-  const checkboxes = document.querySelectorAll('.fs-simbolo-checkbox:checked');
-  const simbolos = Array.from(checkboxes).map(cb => cb.value);
+function selecionarTodasSituacoesFiltroSecretaria(status) {
+  const checkboxes = document.querySelectorAll('.fs-situacao-checkbox');
+  checkboxes.forEach(cb => cb.checked = status);
+}
 
-  const radSit = document.querySelector('input[name="fs-situacao-vaga"]:checked');
-  const situacaoVaga = radSit ? radSit.value : 'ambos';
+async function confirmarBaixarRelatorioSecretaria() {
+  const checkboxesSimb = document.querySelectorAll('.fs-simbolo-checkbox:checked');
+  const simbolos = Array.from(checkboxesSimb).map(cb => cb.value);
+
+  const checkboxesSit = document.querySelectorAll('.fs-situacao-checkbox:checked');
+  const situacaoVaga = Array.from(checkboxesSit).map(cb => cb.value);
 
   const radRec = document.querySelector('input[name="fs-recrutamento"]:checked');
   const recrutamento = radRec ? radRec.value : 'todos';
 
   if (simbolos.length === 0) {
     toast('Selecione ao menos um símbolo de vencimento para gerar o relatório.', 'err');
+    return;
+  }
+
+  if (situacaoVaga.length === 0) {
+    toast('Selecione ao menos uma situação de vaga (ocupados ou vagos) para gerar o relatório.', 'err');
     return;
   }
 

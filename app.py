@@ -881,7 +881,12 @@ def relatorios_comissionados_secretaria():
         if isinstance(simbolos, str):
             simbolos = [s.strip() for s in simbolos.split(",") if s.strip()]
             
-        situacao_vaga = (dados.get("situacao_vaga") or "ambos").strip().lower()
+        situacao_vaga = dados.get("situacao_vaga") or []
+        if isinstance(situacao_vaga, str):
+            situacao_vaga = [s.strip().lower() for s in situacao_vaga.split(",") if s.strip()]
+        else:
+            situacao_vaga = [str(s).strip().lower() for s in situacao_vaga]
+
         recrutamento = (dados.get("recrutamento") or "todos").strip().lower()
 
         # Construção das cláusulas SQL dinâmicas
@@ -907,15 +912,23 @@ def relatorios_comissionados_secretaria():
         elif recrutamento == "limitado":
             where_clauses.append("LOWER(COALESCE(recrutamento, '')) LIKE '%limitado%'")
 
-        # 3. Filtro de Ocupação / Situação de Vaga
-        if situacao_vaga == "ocupado":
-            where_clauses.append("total_ocupados > 0")
-        elif situacao_vaga in ("vago_todos", "vago"):
-            where_clauses.append("total_ocupados = 0")
-        elif situacao_vaga == "vago_com_historico":
-            where_clauses.append("total_ocupados = 0 AND id IN (SELECT DISTINCT cargo_id FROM HistoricoExoneracoes WHERE cargo_id IS NOT NULL)")
-        elif situacao_vaga in ("vago_sem_historico", "so_vago"):
-            where_clauses.append("total_ocupados = 0 AND id NOT IN (SELECT DISTINCT cargo_id FROM HistoricoExoneracoes WHERE cargo_id IS NOT NULL)")
+        # 3. Filtro de Ocupação / Situação de Vaga (Multi-seleção com Checkboxes)
+        sit_set = set(situacao_vaga)
+        if not sit_set or "ambos" in sit_set or "todos" in sit_set or {"ocupado", "vago_com_historico", "vago_sem_historico"}.issubset(sit_set):
+            pass  # Inclui todos os cargos (ocupados e vagos)
+        else:
+            sit_conditions = []
+            if "ocupado" in sit_set:
+                sit_conditions.append("total_ocupados > 0")
+            if "vago_com_historico" in sit_set:
+                sit_conditions.append("(total_ocupados = 0 AND id IN (SELECT DISTINCT cargo_id FROM HistoricoExoneracoes WHERE cargo_id IS NOT NULL))")
+            if "vago_sem_historico" in sit_set or "so_vago" in sit_set:
+                sit_conditions.append("(total_ocupados = 0 AND id NOT IN (SELECT DISTINCT cargo_id FROM HistoricoExoneracoes WHERE cargo_id IS NOT NULL))")
+            if "vago_todos" in sit_set or "vago" in sit_set:
+                sit_conditions.append("total_ocupados = 0")
+
+            if sit_conditions:
+                where_clauses.append(f"({' OR '.join(sit_conditions)})")
 
         where_sql = " AND ".join(where_clauses)
 
@@ -980,14 +993,17 @@ def relatorios_comissionados_secretaria():
         else:
             filtros_partes.append("Símbolos: Todos")
             
-        sit_map = {
-            "ambos": "Ocupação: Ocupados e Vagos",
-            "ocupado": "Ocupação: Somente Ocupados",
-            "vago_todos": "Ocupação: Todos os Vagos",
-            "vago_com_historico": "Ocupação: Vagos com Histórico de Exoneração",
-            "vago_sem_historico": "Ocupação: Só Vagos (Sem Histórico)"
+        sit_desc_map = {
+            "ocupado": "Ocupados",
+            "vago_com_historico": "Vagos c/ Histórico",
+            "vago_sem_historico": "Só Vagos (s/ Histórico)",
+            "vago_todos": "Vagos (Todos)"
         }
-        filtros_partes.append(sit_map.get(situacao_vaga, "Ocupação: Todos"))
+        if not sit_set or "ambos" in sit_set or "todos" in sit_set or {"ocupado", "vago_com_historico", "vago_sem_historico"}.issubset(sit_set):
+            filtros_partes.append("Ocupação: Todos (Ocupados e Vagos)")
+        else:
+            labels = [sit_desc_map.get(s, s.title()) for s in situacao_vaga if s in sit_desc_map]
+            filtros_partes.append(f"Ocupação: {', '.join(labels) if labels else 'Personalizada'}")
         
         rec_map = {
             "todos": "Recrutamento: Todos",

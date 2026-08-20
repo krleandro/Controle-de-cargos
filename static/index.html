@@ -1184,7 +1184,7 @@
               <th onclick="sortBy('total_previstos')" class="td-center">Previstos <span class="sort-arrow hidden" id="arrow-total_previstos"></span></th>
               <th onclick="sortBy('total_ocupados')"  class="td-center">Ocupados <span class="sort-arrow hidden" id="arrow-total_ocupados"></span></th>
               <th onclick="sortBy('saldo_vagas')"     class="td-center">Saldo <span class="sort-arrow hidden" id="arrow-saldo_vagas"></span></th>
-              <th class="no-sort"></th>
+              <th class="no-sort td-center" style="width: 75px;"></th>
             </tr>
           </thead>
           <tbody id="tbody">
@@ -2373,8 +2373,9 @@ function renderTabela() {
         <td class="td-num">${c.total_previstos}</td>
         <td class="td-center" style="color:var(--text-secondary)">${c.total_ocupados}</td>
         <td class="td-center"><span class="saldo-badge ${saldoClass(saldo)}">${saldoLabel(saldo)}</span></td>
-        <td class="td-center">
-          <button class="action-btn" onclick="event.stopPropagation();abrirDrawer(${c.id})" title="Ver detalhes">···</button>
+        <td class="td-center" style="white-space:nowrap;">
+          <button class="action-btn" onclick="event.stopPropagation();gerarRelatorioRapido(${c.id})" title="Gerar Relatório PDF" style="font-size:13px; padding:4px 6px;">📄</button>
+          <button class="action-btn" onclick="event.stopPropagation();abrirDrawer(${c.id})" title="Ver detalhes" style="font-size:13px; padding:4px 6px;">···</button>
         </td>
       </tr>`;
   }).join('');
@@ -2436,6 +2437,7 @@ function renderCartoes() {
         <div class="card-foot">
           <span class="card-code">${c.codigo_fopag || '—'}</span>
           <span class="card-ch">${formatarCH(c.carga_horaria) === '—' ? '' : formatarCH(c.carga_horaria)}</span>
+          <button class="action-btn" style="padding:4px 8px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px; font-weight:600; background:var(--slate-100); border:1px solid var(--border); border-radius:var(--radius-sm);" onclick="event.stopPropagation();gerarRelatorioRapido(${c.id})" title="Gerar Relatório PDF">📄 Relatório</button>
         </div>
       </div>`;
   }).join('');
@@ -2464,6 +2466,7 @@ function renderCompacto() {
         <span class="compact-num">${c.total_previstos}</span>
         <span class="compact-cell"><span class="saldo-badge ${saldoClass(saldo)}">${saldoLabel(saldo)}</span></span>
         <span class="compact-actions">
+          <button class="action-btn" style="font-size:12px; margin-right:4px;" onclick="event.stopPropagation();gerarRelatorioRapido(${c.id})" title="Gerar Relatório PDF">📄</button>
           <button class="action-btn" style="font-size:13px" onclick="event.stopPropagation();abrirDrawer(${c.id})" title="Ver detalhes">···</button>
         </span>
       </div>`;
@@ -3149,18 +3152,26 @@ async function fazerBackup() {
     toast('Backup salvo com sucesso!', 'ok');
   } catch(e) { toast(e.message, 'err'); }
 }
-async function gerarRelatorioPDF() {
-  if (!state.cargoAtivo) { toast('Selecione um cargo primeiro.', 'err'); return; }
+async function gerarRelatorioRapido(cargoId) {
+  const cargo = (state.cargos || []).find(c => c.id === cargoId) || (state.cargoAtivo && state.cargoAtivo.id === cargoId ? state.cargoAtivo : null);
+  const nomeCargo = cargo ? cargo.nome : `Cargo_${cargoId}`;
+  toast(`Gerando relatório PDF de "${nomeCargo}"…`);
   try {
-    const r = await fetch(`/api/cargos/${state.cargoAtivo.id}/relatorio`);
-    if (!r.ok) throw new Error('Erro ao gerar relatório');
+    const r = await fetch(`/api/cargos/${cargoId}/relatorio`);
+    if (!r.ok) {
+      let msg = 'Erro ao gerar relatório';
+      try {
+        const errJson = await r.json();
+        if (errJson && errJson.error) msg = errJson.error;
+      } catch(_) {}
+      throw new Error(msg);
+    }
     const blob = await r.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    // Extrai filename do header Content-Disposition se disponível
     const disp = r.headers.get('content-disposition');
-    let fname = `Relatorio_FOPAG_${state.cargoAtivo.nome.replace(/[^\w\s-]/g,'').replace(/\s+/g,'_')}.pdf`;
+    let fname = `Relatorio_FOPAG_${nomeCargo.replace(/[^\w\s-]/g,'').replace(/\s+/g,'_')}.pdf`;
     if (disp) {
       const m = disp.match(/filename\*?=(?:UTF-8'')?"?([^"]+)"?/);
       if (m) fname = decodeURIComponent(m[1]);
@@ -3170,8 +3181,15 @@ async function gerarRelatorioPDF() {
     a.click();
     a.remove();
     window.URL.revokeObjectURL(url);
-    toast('Relatório gerado com sucesso!', 'ok');
-  } catch(e) { toast(e.message, 'err'); }
+    toast('Relatório baixado com sucesso!', 'ok');
+  } catch(e) {
+    toast(e.message || 'Erro ao gerar relatório', 'err');
+  }
+}
+
+async function gerarRelatorioPDF() {
+  if (!state.cargoAtivo) { toast('Selecione um cargo primeiro.', 'err'); return; }
+  await gerarRelatorioRapido(state.cargoAtivo.id);
 }
 
 function atualizarBotoesFiltro() {

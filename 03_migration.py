@@ -194,10 +194,13 @@ def sanitizar_situacao(valor) -> str:
         return 'Em vigor'
     s = str(valor).strip()
     mapa = {
-        'Em vigor':  'Em vigor',
-        'Extinto':   'Extinto',
-        'Revogado':  'Revogado',
-        'Extintos':  'Extinto',
+        'Em vigor':    'Em vigor',
+        'Em extinção': 'Em extinção',
+        'Em extincao': 'Em extinção',
+        'Extinção':    'Em extinção',
+        'Extinto':     'Extinto',
+        'Revogado':    'Revogado',
+        'Extintos':    'Extinto',
     }
     return mapa.get(s, 'Em vigor')
 

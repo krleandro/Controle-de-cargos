@@ -282,7 +282,7 @@ function TableToolbar({ filtros, onChange, totalFiltrado, onRegistrarLei }) {
       {/* Filtros de situação */}
       <div style={{ display: 'flex', gap: 4, background: TOKENS.bg.sidebar,
                     borderRadius: 8, padding: 4, border: `1px solid ${TOKENS.border.default}` }}>
-        {['Todos', 'Em vigor', 'Extinto', 'Revogado'].map(s => (
+        {['Todos', 'Em vigor', 'Em extinção', 'Extinto', 'Revogado'].map(s => (
           <button key={s} style={btnSecStyle(filtros.situacao === s)}
                   onClick={() => onChange({ ...filtros, situacao: s })}>
             {s}
@@ -329,9 +329,10 @@ function TableToolbar({ filtros, onChange, totalFiltrado, onRegistrarLei }) {
 
 function BadgeSituacao({ situacao }) {
   const styles = {
-    'Em vigor':  { bg: TOKENS.blue.xlightBg,      color: TOKENS.blue.primary },
-    'Extinto':   { bg: TOKENS.status.extinctoBg,   color: TOKENS.status.extinctoText },
-    'Revogado':  { bg: TOKENS.status.dangerBg,     color: TOKENS.status.dangerText },
+    'Em vigor':    { bg: TOKENS.blue.xlightBg,      color: TOKENS.blue.primary },
+    'Em extinção': { bg: '#FEF3C7',                 color: '#D97706' },
+    'Extinto':     { bg: TOKENS.status.extinctoBg,   color: TOKENS.status.extinctoText },
+    'Revogado':    { bg: TOKENS.status.dangerBg,     color: TOKENS.status.dangerText },
   };
   const s = styles[situacao] || styles['Em vigor'];
   return (

@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS Cargos (
     nome                TEXT    NOT NULL,
     codigo_fopag        TEXT,
     situacao            TEXT    NOT NULL DEFAULT 'Em vigor'
-                                CHECK (situacao IN ('Em vigor','Extinto','Revogado')),
+                                CHECK (situacao IN ('Em vigor','Em extinção','Extinto','Revogado')),
     situacao_delib      TEXT    NOT NULL DEFAULT 'não enviado'
                                 CHECK (situacao_delib IN ('Enviado','salvo - em revisão','não enviado')),
     tipo_provimento     TEXT    NOT NULL
@@ -144,8 +144,8 @@ def sanitizar_carga(v):
 
 def sanitizar_sit(v):
     if pd.isna(v): return 'Em vigor'
-    return {'Em vigor':'Em vigor','Extinto':'Extinto','Extintos':'Extinto',
-            'Revogado':'Revogado'}.get(str(v).strip(), 'Em vigor')
+    return {'Em vigor':'Em vigor','Em extinção':'Em extinção','Em extincao':'Em extinção',
+            'Extinto':'Extinto','Extintos':'Extinto','Revogado':'Revogado'}.get(str(v).strip(), 'Em vigor')
 
 def sanitizar_tipo(v):
     if pd.isna(v): return 'Efetivo'

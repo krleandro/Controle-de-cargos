@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS Cargos (
 
     -- Status e provimento
     situacao                TEXT    NOT NULL DEFAULT 'Em vigor'
-                                    CHECK (situacao IN ('Em vigor', 'Extinto', 'Revogado')),
+                                    CHECK (situacao IN ('Em vigor', 'Em extinção', 'Extinto', 'Revogado')),
     situacao_delib          TEXT    NOT NULL DEFAULT 'não enviado'
                                     CHECK (situacao_delib IN ('Enviado', 'salvo - em revisão', 'não enviado')),
     tipo_provimento         TEXT    NOT NULL
@@ -237,6 +237,7 @@ CREATE TABLE IF NOT EXISTS Dominios (
 
 INSERT OR IGNORE INTO Dominios (categoria, valor) VALUES
     ('situacao',        'Em vigor'),
+    ('situacao',        'Em extinção'),
     ('situacao',        'Extinto'),
     ('situacao',        'Revogado'),
     ('situacao_delib',  'Enviado'),

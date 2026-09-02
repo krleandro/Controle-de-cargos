@@ -450,6 +450,7 @@
     border: 1px solid transparent;
   }
   .badge-vigor    { background: var(--success-bg);    color: var(--success-text); border-color: var(--success-border); }
+  .badge-extincao { background: var(--warning-bg);    color: var(--warning-text); border-color: var(--warning-border); }
   .badge-extinto  { background: var(--extinct-bg);    color: var(--extinct-text); border-color: var(--extinct-border); }
   .badge-revogado { background: var(--danger-bg);     color: var(--danger-text);  border-color: var(--danger-border); }
   
@@ -892,6 +893,7 @@
   }
   .card-top { height: 4px; flex-shrink: 0; }
   .card-top.vigor    { background: linear-gradient(90deg, var(--success), #34d399); }
+  .card-top.extincao { background: linear-gradient(90deg, var(--warning), #fbbf24); }
   .card-top.extinto  { background: var(--extinct); }
   .card-top.revogado { background: var(--danger); }
   .card-body { padding: 18px 20px; flex: 1; display: flex; flex-direction: column; gap: 0; }
@@ -1135,9 +1137,10 @@
     <div id="toolbar">
       <div class="filter-group" id="fg-situacao">
         <button class="filter-btn active" data-val="Todos" onclick="setFiltro('situacao',this)">Todos</button>
-        <button class="filter-btn" data-val="Em vigor"  onclick="setFiltro('situacao',this)">Em vigor</button>
-        <button class="filter-btn" data-val="Extinto"   onclick="setFiltro('situacao',this)">Extinto</button>
-        <button class="filter-btn" data-val="Revogado"  onclick="setFiltro('situacao',this)">Revogado</button>
+        <button class="filter-btn" data-val="Em vigor"     onclick="setFiltro('situacao',this)">Em vigor</button>
+        <button class="filter-btn" data-val="Em extinção"  onclick="setFiltro('situacao',this)">Em extinção</button>
+        <button class="filter-btn" data-val="Extinto"      onclick="setFiltro('situacao',this)">Extinto</button>
+        <button class="filter-btn" data-val="Revogado"     onclick="setFiltro('situacao',this)">Revogado</button>
       </div>
       <div class="filter-group" id="fg-tipo">
         <button class="filter-btn active" data-val="Todos"    onclick="setFiltro('tipo',this)">Todos</button>
@@ -1678,6 +1681,7 @@
       <select class="form-control" id="fr-situacao" style="width:100%; height:40px; padding:8px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary);">
         <option value="todos" selected>Todos</option>
         <option value="em vigor">Em vigor</option>
+        <option value="em extinção">Em extinção</option>
         <option value="extinto">Extinto</option>
         <option value="revogado">Revogado</option>
       </select>
@@ -2083,7 +2087,7 @@
       <div class="form-group">
         <label>Situação</label>
         <select class="form-control" id="nc-situacao">
-          <option>Em vigor</option><option>Extinto</option><option>Revogado</option>
+          <option>Em vigor</option><option>Em extinção</option><option>Extinto</option><option>Revogado</option>
         </select>
       </div>
       <div class="form-group">
@@ -2251,7 +2255,7 @@ function saldoLabel(s) {
   return (s > 0 ? '+' : '') + s;
 }
 function badgeSituacao(s) {
-  const cls = s === 'Em vigor' ? 'badge-vigor' : s === 'Extinto' ? 'badge-extinto' : 'badge-revogado';
+  const cls = s === 'Em vigor' ? 'badge-vigor' : s === 'Em extinção' ? 'badge-extincao' : s === 'Extinto' ? 'badge-extinto' : 'badge-revogado';
   return `<span class="badge ${cls}">${s}</span>`;
 }
 function badgeDelib(s) {
@@ -2393,7 +2397,7 @@ function renderCartoes() {
     return;
   }
 
-  const topClass = { 'Em vigor': 'vigor', 'Extinto': 'extinto', 'Revogado': 'revogado' };
+  const topClass = { 'Em vigor': 'vigor', 'Em extinção': 'extincao', 'Extinto': 'extinto', 'Revogado': 'revogado' };
 
   $('cards-grid').innerHTML = filtrados.map(c => {
     const saldo    = c.saldo_vagas;

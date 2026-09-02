@@ -42,6 +42,95 @@ def executar_migracao():
             con.commit()
             print("[MIGRAÇÃO] Coluna 'secretaria' adicionada.")
 
+        # Garante que a coluna 'situacao' aceita 'Em extinção' no CHECK constraint
+        r_cargos_sql = con.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='Cargos'").fetchone()
+        if r_cargos_sql and 'Em extinção' not in r_cargos_sql[0]:
+            print("[MIGRAÇÃO] Atualizando CHECK constraint da tabela Cargos para incluir 'Em extinção'...")
+            con.execute("PRAGMA foreign_keys = OFF;")
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS Cargos_new (
+                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nome                TEXT    NOT NULL,
+                    codigo_fopag        TEXT,
+                    situacao            TEXT    NOT NULL DEFAULT 'Em vigor'
+                                                CHECK (situacao IN ('Em vigor', 'Em extinção', 'Extinto', 'Revogado')),
+                    situacao_delib      TEXT    NOT NULL DEFAULT 'não enviado'
+                                                CHECK (situacao_delib IN ('Enviado','salvo - em revisão','não enviado')),
+                    tipo_provimento     TEXT    NOT NULL
+                                                CHECK (tipo_provimento IN ('Efetivo','Comissão','Eletivo')),
+                    escolaridade        TEXT,
+                    carga_horaria       TEXT,
+                    simbolo_vencimento  TEXT,
+                    total_previstos     INTEGER NOT NULL DEFAULT 0 CHECK (total_previstos >= 0),
+                    total_ocupados      INTEGER NOT NULL DEFAULT 0 CHECK (total_ocupados >= 0),
+                    atribuicoes         TEXT,
+                    criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    recrutamento        TEXT,
+                    restricao_exigencia TEXT,
+                    fonte_carga_horaria TEXT,
+                    fonte_atribuicoes   TEXT,
+                    secretaria          TEXT
+                );
+            """)
+            current_cols = [c[1] for c in con.execute("PRAGMA table_info(Cargos)").fetchall()]
+            cols_str = ", ".join(current_cols)
+            con.execute(f"INSERT INTO Cargos_new ({cols_str}) SELECT {cols_str} FROM Cargos;")
+            
+            # Remove views e triggers dependentes antes de dropar Cargos
+            con.execute("DROP VIEW IF EXISTS vw_SaldoVagas;")
+            con.execute("DROP TRIGGER IF EXISTS trg_ocupantes_insert;")
+            con.execute("DROP TRIGGER IF EXISTS trg_ocupantes_delete;")
+            con.execute("DROP TRIGGER IF EXISTS trg_ocupantes_update;")
+            con.execute("DROP TRIGGER IF EXISTS trg_cargos_atualizado_em;")
+            
+            con.execute("DROP TABLE Cargos;")
+            con.execute("ALTER TABLE Cargos_new RENAME TO Cargos;")
+            con.execute("CREATE INDEX IF NOT EXISTS idx_cargos_situacao ON Cargos (situacao);")
+            con.execute("CREATE INDEX IF NOT EXISTS idx_cargos_tipo ON Cargos (tipo_provimento);")
+            con.execute("""
+                CREATE TRIGGER IF NOT EXISTS trg_cargos_atualizado_em
+                AFTER UPDATE ON Cargos FOR EACH ROW
+                BEGIN
+                    UPDATE Cargos SET atualizado_em = datetime('now','localtime') WHERE id = OLD.id;
+                END;
+            """)
+            
+            # Se Ocupantes já existir, restaura seus triggers
+            r_ocup = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Ocupantes'").fetchone()
+            if r_ocup:
+                con.execute("""
+                    CREATE TRIGGER IF NOT EXISTS trg_ocupantes_insert AFTER INSERT ON Ocupantes
+                    BEGIN
+                        UPDATE Cargos
+                        SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = NEW.cargo_id)
+                        WHERE id = NEW.cargo_id;
+                    END;
+                """)
+                con.execute("""
+                    CREATE TRIGGER IF NOT EXISTS trg_ocupantes_delete AFTER DELETE ON Ocupantes
+                    BEGIN
+                        UPDATE Cargos
+                        SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = OLD.cargo_id)
+                        WHERE id = OLD.cargo_id;
+                    END;
+                """)
+                con.execute("""
+                    CREATE TRIGGER IF NOT EXISTS trg_ocupantes_update AFTER UPDATE ON Ocupantes
+                    BEGIN
+                        UPDATE Cargos
+                        SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = NEW.cargo_id)
+                        WHERE id = NEW.cargo_id;
+                        UPDATE Cargos
+                        SET total_ocupados = (SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = OLD.cargo_id)
+                        WHERE id = OLD.cargo_id;
+                    END;
+                """)
+            
+            con.commit()
+            con.execute("PRAGMA foreign_keys = ON;")
+            print("[MIGRAÇÃO] CHECK constraint da tabela Cargos atualizado com sucesso.")
+
         # Recria a view vw_SaldoVagas para incluir 'secretaria'
         con.execute("DROP VIEW IF EXISTS vw_SaldoVagas")
         con.execute("""
@@ -229,6 +318,7 @@ def get_stats():
               COALESCE(SUM(saldo_vagas), 0)                     AS total_saldo,
               COALESCE(SUM(alerta_saldo_negativo), 0)           AS alertas,
               SUM(CASE situacao WHEN 'Em vigor' THEN 1 ELSE 0 END) AS em_vigor,
+              SUM(CASE situacao WHEN 'Em extinção' THEN 1 ELSE 0 END) AS em_extincao,
               SUM(CASE situacao WHEN 'Extinto'  THEN 1 ELSE 0 END) AS extintos,
               SUM(CASE tipo_provimento WHEN 'Efetivo'  THEN 1 ELSE 0 END) AS efetivos,
               SUM(CASE WHEN tipo_provimento IN ('Comissão', 'Comissao') THEN 1 ELSE 0 END) AS comissao
@@ -795,6 +885,8 @@ def relatorios_consolidado():
         val = situacao
         if val.lower() == "em vigor":
             val = "Em vigor"
+        elif val.lower() in ("em extinção", "em extincao"):
+            val = "Em extinção"
         elif val.lower() == "extinto":
             val = "Extinto"
         elif val.lower() == "revogado":
@@ -1089,7 +1181,7 @@ def listar_ocupantes():
         FROM Cargos c
         LEFT JOIN Ocupantes o ON o.cargo_id = c.id
         WHERE c.tipo_provimento IN ('Comissão', 'Comissao', 'Eletivo')
-          AND (c.situacao = 'Em vigor' OR o.id IS NOT NULL)
+          AND (c.situacao IN ('Em vigor', 'Em extinção') OR o.id IS NOT NULL)
     """
     params = []
     if q:

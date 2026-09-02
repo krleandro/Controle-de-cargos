@@ -203,9 +203,10 @@ class RelatorioCargoPDF(FPDF):
         tipo  = cargo.get("tipo_provimento", "Efetivo")
 
         sit_cores = {
-            "Em vigor": (AZUL_SUAVE, AZUL_MEDIO),
-            "Extinto":  (CINZA_100, CINZA_600),
-            "Revogado": (VERMELHO_BG, VERMELHO_ESC),
+            "Em vigor":    (AZUL_SUAVE, AZUL_MEDIO),
+            "Em extinção": (AMBAR_BG, AMBAR_ESC),
+            "Extinto":     (CINZA_100, CINZA_600),
+            "Revogado":    (VERMELHO_BG, VERMELHO_ESC),
         }
         tipo_cores = {
             "Efetivo":  (AZUL_SUAVE, AZUL_INST),
@@ -719,9 +720,10 @@ class RelatorioCargoPDF(FPDF):
 
         # Badges
         sit_cores = {
-            "Em vigor": (AZUL_SUAVE, AZUL_MEDIO),
-            "Extinto":  (CINZA_100, CINZA_600),
-            "Revogado": (VERMELHO_BG, VERMELHO_ESC),
+            "Em vigor":    (AZUL_SUAVE, AZUL_MEDIO),
+            "Em extinção": (AMBAR_BG, AMBAR_ESC),
+            "Extinto":     (CINZA_100, CINZA_600),
+            "Revogado":    (VERMELHO_BG, VERMELHO_ESC),
         }
         tipo_cores = {
             "Efetivo":  (AZUL_SUAVE, AZUL_INST),

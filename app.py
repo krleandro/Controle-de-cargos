@@ -30,6 +30,251 @@ def remove_accents(text):
     ).lower()
 
 
+def _popular_parcelas_iniciais(con):
+    """Popula automaticamente as parcelas da Deliberação 359 caso a tabela esteja vazia."""
+    try:
+        cur = con.cursor()
+        cur.execute("SELECT COUNT(*) FROM Parcelas")
+        if cur.fetchone()[0] > 0:
+            return
+
+        print("[MIGRAÇÃO] Populando parcelas iniciais da Deliberação 359 TCE/RJ...")
+        parcelas_data = [
+            {
+                "codigo_fopag": "1",
+                "nome_norma": "Vencimento",
+                "complemento": None,
+                "nome_fopag": "Vencimento Base",
+                "tipo": "A Crédito",
+                "natureza": "Remuneratória",
+                "carater": "Permanente",
+                "incide_ir": "Sim",
+                "incide_previdencia": "Sim",
+                "incide_teto": "Sim",
+                "natureza_rubrica": "1000 - Salário, vencimento, soldo",
+                "incorporavel": 0,
+                "forma_calculo": "Valor Nominal Variável",
+                "valor_percentual": None,
+                "valor_nominal": 19000.0,
+                "norma_desconhecida": 0,
+                "data_criacao": "1999-10-17",
+                "situacao": "Em vigor",
+                "qualquer_cargo": 1,
+                "situacao_delib": "Enviado",
+                "normas": [
+                    {"objeto": "Criação", "tipo_norma": "Lei ordinária Municipal", "numero": "796", "ano": 1999}
+                ],
+                "cargo_names": [],
+                "base_calculo_codigos": []
+            },
+            {
+                "codigo_fopag": "6",
+                "nome_norma": "Adicional por serviço extraordinário",
+                "complemento": None,
+                "nome_fopag": "hora extra",
+                "tipo": "A Crédito",
+                "natureza": "Remuneratória",
+                "carater": "Transitória",
+                "incide_ir": "Sim",
+                "incide_previdencia": "Não",
+                "incide_teto": "Sim",
+                "natureza_rubrica": "1003 - Horas extraordinárias",
+                "incorporavel": 0,
+                "forma_calculo": "Percentual Variável",
+                "valor_percentual": 50.0,
+                "valor_nominal": None,
+                "norma_desconhecida": 0,
+                "data_criacao": "1999-10-17",
+                "situacao": "Em vigor",
+                "qualquer_cargo": 1,
+                "situacao_delib": "Enviado",
+                "normas": [
+                    {"objeto": "Criação", "tipo_norma": "Lei ordinária Municipal", "numero": "796", "ano": 1999}
+                ],
+                "cargo_names": [],
+                "base_calculo_codigos": ["1"]
+            },
+            {
+                "codigo_fopag": "98",
+                "nome_norma": "Adicional Noturno",
+                "complemento": None,
+                "nome_fopag": "Adicional Noturno",
+                "tipo": "A Crédito",
+                "natureza": "Remuneratória",
+                "carater": "Transitória",
+                "incide_ir": "Sim",
+                "incide_previdencia": "Não",
+                "incide_teto": "Sim",
+                "natureza_rubrica": "1205 - Adicional noturno",
+                "incorporavel": 0,
+                "forma_calculo": "Percentual Variável",
+                "valor_percentual": 25.0,
+                "valor_nominal": None,
+                "norma_desconhecida": 0,
+                "data_criacao": "1999-10-17",
+                "situacao": "Em vigor",
+                "qualquer_cargo": 1,
+                "situacao_delib": "Enviado",
+                "normas": [
+                    {"objeto": "Criação", "tipo_norma": "Lei ordinária Municipal", "numero": "796", "ano": 1999}
+                ],
+                "cargo_names": [],
+                "base_calculo_codigos": ["1"]
+            },
+            {
+                "codigo_fopag": "344",
+                "nome_norma": "GIDATI",
+                "complemento": None,
+                "nome_fopag": "GIDATI",
+                "tipo": "A Crédito",
+                "natureza": "Remuneratória",
+                "carater": "Permanente",
+                "incide_ir": "Sim",
+                "incide_previdencia": "Sim",
+                "incide_teto": "Sim",
+                "natureza_rubrica": "1212 - Gratificações ou outras verbas de natureza permanente",
+                "incorporavel": 1,
+                "forma_calculo": "Valor Nominal Variável",
+                "valor_percentual": None,
+                "valor_nominal": 662.82,
+                "norma_desconhecida": 0,
+                "data_criacao": "2020-03-23",
+                "situacao": "Em vigor",
+                "qualquer_cargo": 0,
+                "situacao_delib": "Enviado",
+                "normas": [
+                    {"objeto": "Criação", "tipo_norma": "Lei ordinária Municipal", "numero": "1884", "ano": 2020},
+                    {"objeto": "Incorporação", "tipo_norma": "Lei ordinária Municipal", "numero": "1884", "ano": 2020, "detalhes": "Parcela Incorpora - 31/03/2020"}
+                ],
+                "cargo_names": ["Técnico em Tecnologia da Informação"],
+                "base_calculo_codigos": []
+            },
+            {
+                "codigo_fopag": "353",
+                "nome_norma": "Adicional de Qualificação",
+                "complemento": None,
+                "nome_fopag": "Adicional de Qualificação",
+                "tipo": "A Crédito",
+                "natureza": "Remuneratória",
+                "carater": "Permanente",
+                "incide_ir": "Sim",
+                "incide_previdencia": "Sim",
+                "incide_teto": "Sim",
+                "natureza_rubrica": "1212 - Gratificações ou outras verbas de natureza permanente",
+                "incorporavel": 0,
+                "forma_calculo": "Percentual Variável",
+                "valor_percentual": 15.0,
+                "valor_nominal": None,
+                "norma_desconhecida": 1,
+                "data_criacao": None,
+                "situacao": "Em vigor",
+                "qualquer_cargo": 0,
+                "situacao_delib": "não enviado",
+                "normas": [],
+                "cargo_names": [
+                    "Técnico de Administração",
+                    "Técnico em Tecnologia da Informação",
+                    "Analista de Tecnologia da Informação",
+                    "Contador",
+                    "Fiscal de Tributos",
+                    "Pedagogo",
+                    "Auditor",
+                    "Auxiliar de Administração"
+                ],
+                "base_calculo_codigos": ["1"]
+            },
+            {
+                "codigo_fopag": "368",
+                "nome_norma": "Assistência Financeira Complementar",
+                "complemento": None,
+                "nome_fopag": "Assistência Financeira Complementar",
+                "tipo": "A Crédito",
+                "natureza": "Remuneratória",
+                "carater": "Transitória",
+                "incide_ir": "Sim",
+                "incide_previdencia": "Não",
+                "incide_teto": "Sim",
+                "natureza_rubrica": "1401 - Abono",
+                "incorporavel": 0,
+                "forma_calculo": "Valor Nominal Variável",
+                "valor_percentual": None,
+                "valor_nominal": 1950.0,
+                "norma_desconhecida": 0,
+                "data_criacao": "2023-09-14",
+                "situacao": "Em vigor",
+                "qualquer_cargo": 0,
+                "situacao_delib": "Enviado",
+                "normas": [
+                    {"objeto": "Regulamentação", "tipo_norma": "Lei ordinária Municipal", "numero": "2105", "ano": 2023}
+                ],
+                "cargo_names": [
+                    "Auxiliar de Enfermagem",
+                    "Técnico de Enfermagem",
+                    "Enfermeiro (ou Enfermeiro ESF)"
+                ],
+                "base_calculo_codigos": []
+            }
+        ]
+
+        cargo_map = {}
+        cur.execute("SELECT id, nome FROM Cargos")
+        for cid, cnome in cur.fetchall():
+            cargo_map[cnome.strip().lower()] = cid
+
+        created = {}
+        for p in parcelas_data:
+            cur.execute("""
+                INSERT INTO Parcelas (
+                    codigo_fopag, nome_norma, complemento, nome_fopag,
+                    tipo, natureza, carater,
+                    incide_ir, incide_previdencia, incide_teto,
+                    natureza_rubrica, incorporavel, forma_calculo,
+                    valor_percentual, valor_nominal, norma_desconhecida,
+                    data_criacao, situacao, qualquer_cargo, situacao_delib
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                p["codigo_fopag"], p["nome_norma"], p["complemento"], p["nome_fopag"],
+                p["tipo"], p["natureza"], p["carater"],
+                p["incide_ir"], p["incide_previdencia"], p["incide_teto"],
+                p["natureza_rubrica"], p["incorporavel"], p["forma_calculo"],
+                p["valor_percentual"], p["valor_nominal"], p["norma_desconhecida"],
+                p["data_criacao"], p["situacao"], p["qualquer_cargo"], p["situacao_delib"]
+            ))
+            pid = cur.lastrowid
+            created[p["codigo_fopag"]] = pid
+
+            for n in p["normas"]:
+                cur.execute("""
+                    INSERT INTO ParcelasNormas (
+                        parcela_id, objeto, tipo_norma, numero, ano, dispositivo, detalhes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    pid, n.get("objeto"), n.get("tipo_norma"), n.get("numero"),
+                    n.get("ano"), n.get("dispositivo"), n.get("detalhes")
+                ))
+
+            for cname in p["cargo_names"]:
+                cn_clean = cname.strip().lower()
+                cid = cargo_map.get(cn_clean)
+                if not cid:
+                    for k, v in cargo_map.items():
+                        if cn_clean in k or k in cn_clean:
+                            cid = v
+                            break
+                if cid:
+                    cur.execute("INSERT OR IGNORE INTO ParcelasCargos (parcela_id, cargo_id) VALUES (?, ?)", (pid, cid))
+
+        for p in parcelas_data:
+            pid = created[p["codigo_fopag"]]
+            for bcod in p["base_calculo_codigos"]:
+                if bcod in created:
+                    cur.execute("INSERT OR IGNORE INTO ParcelasBaseCalculo (parcela_id, parcela_base_id) VALUES (?, ?)", (pid, created[bcod]))
+
+        print(f"[MIGRAÇÃO] {len(created)} parcelas iniciais inseridas com sucesso.")
+    except Exception as e:
+        print(f"[ERRO MIGRAÇÃO PARCELAS INICIAIS] {e}")
+
+
 # ── Migração: Criar tabela Ocupantes e triggers se não existirem ──────────────
 def executar_migracao():
     con = sqlite3.connect(DB_PATH)
@@ -302,6 +547,7 @@ def executar_migracao():
                 UPDATE Parcelas SET atualizado_em = datetime('now','localtime') WHERE id = OLD.id;
             END;
         """)
+        _popular_parcelas_iniciais(con)
         con.commit()
         print("[MIGRAÇÃO] Tabelas do Módulo de Parcelas criadas/verificadas com sucesso.")
     except Exception as e:

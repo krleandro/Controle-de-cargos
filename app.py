@@ -221,6 +221,89 @@ def executar_migracao():
         """)
         con.commit()
         print("[MIGRAÇÃO] Tabela HistoricoExoneracoes verificada/criada.")
+
+        # Criar tabelas do Módulo de Parcelas (Deliberação 359 TCE/RJ)
+        con.executescript("""
+            CREATE TABLE IF NOT EXISTS Parcelas (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                codigo_fopag        TEXT NOT NULL UNIQUE,
+                nome_norma          TEXT,
+                complemento         TEXT,
+                nome_fopag          TEXT,
+                tipo                TEXT NOT NULL CHECK (tipo IN ('A Crédito', 'A Débito')),
+                natureza            TEXT CHECK (natureza IN ('Remuneratória', 'Indenizatória', NULL)),
+                carater             TEXT CHECK (carater IN ('Permanente', 'Transitória', NULL)),
+                incide_ir           TEXT CHECK (incide_ir IN ('Sim', 'Não', NULL)),
+                incide_previdencia  TEXT CHECK (incide_previdencia IN ('Sim', 'Não', 'Facultativo', NULL)),
+                incide_teto         TEXT CHECK (incide_teto IN ('Sim', 'Não', NULL)),
+                natureza_rubrica    TEXT,
+                incorporavel        INTEGER NOT NULL DEFAULT 0,
+                forma_calculo       TEXT NOT NULL DEFAULT 'Percentual' CHECK (forma_calculo IN (
+                                        'Percentual',
+                                        'Percentual Variável',
+                                        'Valor Nominal Fixo',
+                                        'Valor Nominal Variável',
+                                        'Percentual sobre o Salário Mínimo Nacional'
+                                    )),
+                valor_percentual    REAL DEFAULT NULL,
+                valor_nominal       REAL DEFAULT NULL,
+                norma_desconhecida  INTEGER NOT NULL DEFAULT 0,
+                data_criacao        TEXT,
+                situacao            TEXT NOT NULL DEFAULT 'Em vigor' CHECK (situacao IN ('Em vigor', 'Em extinção', 'Extinta', 'Revogada')),
+                qualquer_cargo      INTEGER NOT NULL DEFAULT 0,
+                situacao_delib      TEXT NOT NULL DEFAULT 'não enviado' CHECK (situacao_delib IN ('Enviado', 'salvo - em revisão', 'não enviado')),
+                criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_parcelas_codigo ON Parcelas (codigo_fopag);
+            CREATE INDEX IF NOT EXISTS idx_parcelas_tipo   ON Parcelas (tipo);
+            CREATE INDEX IF NOT EXISTS idx_parcelas_delib  ON Parcelas (situacao_delib);
+
+            CREATE TABLE IF NOT EXISTS ParcelasBaseCalculo (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
+                parcela_base_id     INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
+                criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                UNIQUE (parcela_id, parcela_base_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_pbc_parcela ON ParcelasBaseCalculo (parcela_id);
+
+            CREATE TABLE IF NOT EXISTS ParcelasNormas (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
+                objeto              TEXT NOT NULL CHECK (objeto IN ('Criação', 'Alteração', 'Regulamentação', 'Extinção')),
+                tipo_norma         TEXT NOT NULL DEFAULT 'Lei',
+                numero              TEXT NOT NULL,
+                ano                 INTEGER,
+                dispositivo         TEXT,
+                lei_id              INTEGER REFERENCES LeisPertinentes (id) ON DELETE SET NULL,
+                detalhes            TEXT,
+                criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_pn_parcela ON ParcelasNormas (parcela_id);
+
+            CREATE TABLE IF NOT EXISTS ParcelasCargos (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
+                cargo_id            INTEGER NOT NULL REFERENCES Cargos (id) ON DELETE CASCADE,
+                criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                UNIQUE (parcela_id, cargo_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_pc_parcela ON ParcelasCargos (parcela_id);
+            CREATE INDEX IF NOT EXISTS idx_pc_cargo   ON ParcelasCargos (cargo_id);
+
+            CREATE TRIGGER IF NOT EXISTS trg_parcelas_atualizado_em
+            AFTER UPDATE ON Parcelas FOR EACH ROW
+            BEGIN
+                UPDATE Parcelas SET atualizado_em = datetime('now','localtime') WHERE id = OLD.id;
+            END;
+        """)
+        con.commit()
+        print("[MIGRAÇÃO] Tabelas do Módulo de Parcelas criadas/verificadas com sucesso.")
     except Exception as e:
         print(f"[ERRO MIGRAÇÃO] Falha ao rodar migrações: {e}")
     finally:
@@ -1453,6 +1536,411 @@ def listar_ocupantes_cargo(cargo_id):
             SELECT * FROM Ocupantes
             WHERE cargo_id = ?
             ORDER BY nome COLLATE NOCASE
+        """, (cargo_id,)).fetchall()
+        return jsonify([dict(r) for r in rows])
+    finally:
+        con.close()
+
+
+# ── Módulo de Parcelas (Deliberação 359 TCE/RJ) ────────────────────────────────
+
+@app.route("/api/parcelas/stats", methods=["GET"])
+def stats_parcelas():
+    """KPIs do módulo de parcelas."""
+    con = get_db_connection()
+    try:
+        row = con.execute("""
+            SELECT
+                COUNT(*)                                                                             AS total,
+                COALESCE(SUM(CASE WHEN tipo = 'A Crédito' THEN 1 ELSE 0 END), 0)                     AS total_credito,
+                COALESCE(SUM(CASE WHEN tipo = 'A Débito' THEN 1 ELSE 0 END), 0)                      AS total_debito,
+                COALESCE(SUM(CASE WHEN natureza = 'Remuneratória' THEN 1 ELSE 0 END), 0)             AS total_remuneratoria,
+                COALESCE(SUM(CASE WHEN natureza = 'Indenizatória' THEN 1 ELSE 0 END), 0)             AS total_indenizatoria,
+                COALESCE(SUM(CASE WHEN carater = 'Permanente' THEN 1 ELSE 0 END), 0)                 AS total_permanente,
+                COALESCE(SUM(CASE WHEN carater = 'Transitória' THEN 1 ELSE 0 END), 0)                AS total_transitoria,
+                COALESCE(SUM(CASE WHEN situacao_delib = 'Enviado' THEN 1 ELSE 0 END), 0)             AS delib_enviado,
+                COALESCE(SUM(CASE WHEN situacao_delib = 'salvo - em revisão' THEN 1 ELSE 0 END), 0)   AS delib_revisao,
+                COALESCE(SUM(CASE WHEN situacao_delib = 'não enviado' THEN 1 ELSE 0 END), 0)         AS delib_nao_enviado
+            FROM Parcelas;
+        """).fetchone()
+        return jsonify(dict(row))
+    finally:
+        con.close()
+
+
+@app.route("/api/parcelas", methods=["GET"])
+def listar_parcelas():
+    """Lista parcelas cadastradas com contadores de normas e cargos vinculados."""
+    q = request.args.get("q", "").strip()
+    tipo = request.args.get("tipo", "").strip()
+    natureza = request.args.get("natureza", "").strip()
+    carater = request.args.get("carater", "").strip()
+    situacao_delib = request.args.get("situacao_delib", "").strip()
+
+    sql = """
+        SELECT
+            p.*,
+            (SELECT COUNT(*) FROM ParcelasNormas pn WHERE pn.parcela_id = p.id) AS total_normas,
+            (SELECT COUNT(*) FROM ParcelasCargos pc WHERE pc.parcela_id = p.id) AS total_cargos,
+            (SELECT COUNT(*) FROM ParcelasBaseCalculo pbc WHERE pbc.parcela_id = p.id) AS total_base
+        FROM Parcelas p
+        WHERE 1=1
+    """
+    params = []
+
+    if q:
+        sql += """ AND (
+            p.codigo_fopag LIKE ? OR
+            remove_accents(p.nome_fopag) LIKE remove_accents(?) OR
+            remove_accents(p.nome_norma) LIKE remove_accents(?) OR
+            remove_accents(p.complemento) LIKE remove_accents(?)
+        )"""
+        like_q = f"%{q}%"
+        params.extend([like_q, like_q, like_q, like_q])
+
+    if tipo and tipo.lower() != "todos":
+        sql += " AND p.tipo = ?"
+        params.append(tipo)
+
+    if natureza and natureza.lower() not in ("todos", "todas"):
+        sql += " AND p.natureza = ?"
+        params.append(natureza)
+
+    if carater and carater.lower() != "todos":
+        sql += " AND p.carater = ?"
+        params.append(carater)
+
+    if situacao_delib and situacao_delib.lower() not in ("todos", "todas"):
+        sql += " AND p.situacao_delib = ?"
+        params.append(situacao_delib)
+
+    sql += " ORDER BY CASE WHEN p.tipo = 'A Crédito' THEN 1 ELSE 2 END, CAST(p.codigo_fopag AS INTEGER) ASC, p.codigo_fopag ASC"
+
+    con = get_db_connection()
+    try:
+        rows = con.execute(sql, params).fetchall()
+        return jsonify([dict(r) for r in rows])
+    finally:
+        con.close()
+
+
+@app.route("/api/parcelas/<int:parcela_id>", methods=["GET"])
+def obter_parcela(parcela_id):
+    """Retorna detalhes completos da parcela, incluindo base de cálculo, normas e cargos."""
+    con = get_db_connection()
+    try:
+        p = con.execute("SELECT * FROM Parcelas WHERE id = ?", (parcela_id,)).fetchone()
+        if not p:
+            abort(404, description="Parcela não encontrada")
+
+        parcela = dict(p)
+
+        # Base de cálculo
+        base_rows = con.execute("""
+            SELECT p.id, p.codigo_fopag, p.nome_fopag, p.nome_norma, p.tipo
+            FROM ParcelasBaseCalculo pbc
+            JOIN Parcelas p ON p.id = pbc.parcela_base_id
+            WHERE pbc.parcela_id = ?
+            ORDER BY CAST(p.codigo_fopag AS INTEGER) ASC, p.codigo_fopag ASC
+        """, (parcela_id,)).fetchall()
+        parcela["base_calculo"] = [dict(r) for r in base_rows]
+        parcela["base_calculo_ids"] = [r["id"] for r in base_rows]
+
+        # Normas vinculadas
+        normas_rows = con.execute("""
+            SELECT pn.*, lp.descricao AS lei_descricao
+            FROM ParcelasNormas pn
+            LEFT JOIN LeisPertinentes lp ON lp.id = pn.lei_id
+            WHERE pn.parcela_id = ?
+            ORDER BY pn.ano DESC, CAST(pn.numero AS INTEGER) DESC, pn.id DESC
+        """, (parcela_id,)).fetchall()
+        parcela["normas"] = [dict(r) for r in normas_rows]
+
+        # Cargos vinculados
+        cargos_rows = con.execute("""
+            SELECT c.id, c.nome, c.codigo_fopag, c.tipo_provimento, c.situacao
+            FROM ParcelasCargos pc
+            JOIN Cargos c ON c.id = pc.cargo_id
+            WHERE pc.parcela_id = ?
+            ORDER BY c.nome COLLATE NOCASE
+        """, (parcela_id,)).fetchall()
+        parcela["cargos"] = [dict(r) for r in cargos_rows]
+        parcela["cargo_ids"] = [r["id"] for r in cargos_rows]
+
+        return jsonify(parcela)
+    finally:
+        con.close()
+
+
+@app.route("/api/parcelas", methods=["POST"])
+def criar_parcela():
+    """Cadastra nova parcela com base de cálculo, normas e cargos correlacionados."""
+    dados = request.get_json(force=True) or {}
+    codigo_fopag = str(dados.get("codigo_fopag", "")).strip()
+
+    if not codigo_fopag:
+        abort(400, description="O campo Código na FOPAG é obrigatório para salvar rascunho.")
+
+    tipo = dados.get("tipo", "A Crédito")
+    if tipo not in ("A Crédito", "A Débito"):
+        tipo = "A Crédito"
+
+    situacao_delib = dados.get("situacao_delib", "salvo - em revisão")
+    if situacao_delib not in ("Enviado", "salvo - em revisão", "não enviado"):
+        situacao_delib = "salvo - em revisão"
+
+    forma_calculo = dados.get("forma_calculo", "Percentual")
+
+    con = get_db_connection()
+    try:
+        # Verifica se já existe código FOPAG
+        existe = con.execute("SELECT id FROM Parcelas WHERE codigo_fopag = ?", (codigo_fopag,)).fetchone()
+        if existe:
+            abort(409, description=f"Já existe uma parcela cadastrada com o Código FOPAG '{codigo_fopag}'.")
+
+        cursor = con.execute("""
+            INSERT INTO Parcelas (
+                codigo_fopag, nome_norma, complemento, nome_fopag,
+                tipo, natureza, carater,
+                incide_ir, incide_previdencia, incide_teto,
+                natureza_rubrica, incorporavel, forma_calculo,
+                valor_percentual, valor_nominal, norma_desconhecida,
+                data_criacao, situacao, qualquer_cargo, situacao_delib
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            codigo_fopag,
+            dados.get("nome_norma") or None,
+            dados.get("complemento") or None,
+            dados.get("nome_fopag") or None,
+            tipo,
+            dados.get("natureza") or None,
+            dados.get("carater") or None,
+            dados.get("incide_ir") or None,
+            dados.get("incide_previdencia") or None,
+            dados.get("incide_teto") or None,
+            dados.get("natureza_rubrica") or None,
+            1 if dados.get("incorporavel") else 0,
+            forma_calculo,
+            dados.get("valor_percentual") if dados.get("valor_percentual") not in ("", None) else None,
+            dados.get("valor_nominal") if dados.get("valor_nominal") not in ("", None) else None,
+            1 if dados.get("norma_desconhecida") else 0,
+            dados.get("data_criacao") or None,
+            dados.get("situacao", "Em vigor"),
+            1 if dados.get("qualquer_cargo") else 0,
+            situacao_delib
+        ))
+        parcela_id = cursor.lastrowid
+
+        # Salvar parcelas que compõem a base de cálculo
+        base_ids = dados.get("base_calculo_ids") or []
+        for b_id in base_ids:
+            try:
+                b_int = int(b_id)
+                con.execute("INSERT OR IGNORE INTO ParcelasBaseCalculo (parcela_id, parcela_base_id) VALUES (?, ?)", (parcela_id, b_int))
+            except (ValueError, TypeError):
+                continue
+
+        # Salvar normas
+        normas = dados.get("normas") or []
+        for n in normas:
+            if not n.get("numero"):
+                continue
+            con.execute("""
+                INSERT INTO ParcelasNormas (
+                    parcela_id, objeto, tipo_norma, numero, ano, dispositivo, lei_id, detalhes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                parcela_id,
+                n.get("objeto", "Criação"),
+                n.get("tipo_norma", "Lei"),
+                str(n.get("numero", "")).strip(),
+                int(n.get("ano")) if n.get("ano") else None,
+                n.get("dispositivo") or None,
+                int(n.get("lei_id")) if n.get("lei_id") else None,
+                n.get("detalhes") or None
+            ))
+
+        # Salvar cargos correlacionados
+        if not dados.get("qualquer_cargo"):
+            cargo_ids = dados.get("cargo_ids") or []
+            for c_id in cargo_ids:
+                try:
+                    c_int = int(c_id)
+                    con.execute("INSERT OR IGNORE INTO ParcelasCargos (parcela_id, cargo_id) VALUES (?, ?)", (parcela_id, c_int))
+                except (ValueError, TypeError):
+                    continue
+
+        con.commit()
+        return jsonify({"id": parcela_id, "mensagem": "Parcela cadastrada com sucesso!"}), 201
+    except Exception as e:
+        con.rollback()
+        abort(500, description=f"Erro ao salvar parcela: {e}")
+    finally:
+        con.close()
+
+
+@app.route("/api/parcelas/<int:parcela_id>", methods=["PUT"])
+def atualizar_parcela(parcela_id):
+    """Atualiza os dados de uma parcela existente."""
+    dados = request.get_json(force=True) or {}
+    codigo_fopag = str(dados.get("codigo_fopag", "")).strip()
+
+    if not codigo_fopag:
+        abort(400, description="O campo Código na FOPAG é obrigatório para salvar rascunho.")
+
+    tipo = dados.get("tipo", "A Crédito")
+    if tipo not in ("A Crédito", "A Débito"):
+        tipo = "A Crédito"
+
+    situacao_delib = dados.get("situacao_delib")
+    forma_calculo = dados.get("forma_calculo", "Percentual")
+
+    con = get_db_connection()
+    try:
+        # Verifica se parcela existe
+        atual = con.execute("SELECT id, situacao_delib FROM Parcelas WHERE id = ?", (parcela_id,)).fetchone()
+        if not atual:
+            abort(404, description="Parcela não encontrada")
+
+        if not situacao_delib:
+            situacao_delib = atual["situacao_delib"]
+
+        # Verifica duplicidade de código FOPAG em outra parcela
+        existe = con.execute("SELECT id FROM Parcelas WHERE codigo_fopag = ? AND id != ?", (codigo_fopag, parcela_id)).fetchone()
+        if existe:
+            abort(409, description=f"O Código FOPAG '{codigo_fopag}' já está em uso por outra parcela.")
+
+        con.execute("""
+            UPDATE Parcelas SET
+                codigo_fopag=?, nome_norma=?, complemento=?, nome_fopag=?,
+                tipo=?, natureza=?, carater=?,
+                incide_ir=?, incide_previdencia=?, incide_teto=?,
+                natureza_rubrica=?, incorporavel=?, forma_calculo=?,
+                valor_percentual=?, valor_nominal=?, norma_desconhecida=?,
+                data_criacao=?, situacao=?, qualquer_cargo=?, situacao_delib=?,
+                atualizado_em=datetime('now','localtime')
+            WHERE id=?
+        """, (
+            codigo_fopag,
+            dados.get("nome_norma") or None,
+            dados.get("complemento") or None,
+            dados.get("nome_fopag") or None,
+            tipo,
+            dados.get("natureza") or None,
+            dados.get("carater") or None,
+            dados.get("incide_ir") or None,
+            dados.get("incide_previdencia") or None,
+            dados.get("incide_teto") or None,
+            dados.get("natureza_rubrica") or None,
+            1 if dados.get("incorporavel") else 0,
+            forma_calculo,
+            dados.get("valor_percentual") if dados.get("valor_percentual") not in ("", None) else None,
+            dados.get("valor_nominal") if dados.get("valor_nominal") not in ("", None) else None,
+            1 if dados.get("norma_desconhecida") else 0,
+            dados.get("data_criacao") or None,
+            dados.get("situacao", "Em vigor"),
+            1 if dados.get("qualquer_cargo") else 0,
+            situacao_delib,
+            parcela_id
+        ))
+
+        # Atualizar bases de cálculo
+        con.execute("DELETE FROM ParcelasBaseCalculo WHERE parcela_id = ?", (parcela_id,))
+        base_ids = dados.get("base_calculo_ids") or []
+        for b_id in base_ids:
+            try:
+                b_int = int(b_id)
+                con.execute("INSERT OR IGNORE INTO ParcelasBaseCalculo (parcela_id, parcela_base_id) VALUES (?, ?)", (parcela_id, b_int))
+            except (ValueError, TypeError):
+                continue
+
+        # Atualizar normas
+        con.execute("DELETE FROM ParcelasNormas WHERE parcela_id = ?", (parcela_id,))
+        normas = dados.get("normas") or []
+        for n in normas:
+            if not n.get("numero"):
+                continue
+            con.execute("""
+                INSERT INTO ParcelasNormas (
+                    parcela_id, objeto, tipo_norma, numero, ano, dispositivo, lei_id, detalhes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                parcela_id,
+                n.get("objeto", "Criação"),
+                n.get("tipo_norma", "Lei"),
+                str(n.get("numero", "")).strip(),
+                int(n.get("ano")) if n.get("ano") else None,
+                n.get("dispositivo") or None,
+                int(n.get("lei_id")) if n.get("lei_id") else None,
+                n.get("detalhes") or None
+            ))
+
+        # Atualizar cargos
+        con.execute("DELETE FROM ParcelasCargos WHERE parcela_id = ?", (parcela_id,))
+        if not dados.get("qualquer_cargo"):
+            cargo_ids = dados.get("cargo_ids") or []
+            for c_id in cargo_ids:
+                try:
+                    c_int = int(c_id)
+                    con.execute("INSERT OR IGNORE INTO ParcelasCargos (parcela_id, cargo_id) VALUES (?, ?)", (parcela_id, c_int))
+                except (ValueError, TypeError):
+                    continue
+
+        con.commit()
+        return jsonify({"mensagem": "Parcela atualizada com sucesso!"})
+    except Exception as e:
+        con.rollback()
+        abort(500, description=f"Erro ao atualizar parcela: {e}")
+    finally:
+        con.close()
+
+
+@app.route("/api/parcelas/<int:parcela_id>", methods=["DELETE"])
+def excluir_parcela(parcela_id):
+    """Exclui uma parcela do cadastro."""
+    con = get_db_connection()
+    try:
+        r = con.execute("DELETE FROM Parcelas WHERE id = ?", (parcela_id,))
+        if r.rowcount == 0:
+            abort(404, description="Parcela não encontrada")
+        con.commit()
+        return jsonify({"mensagem": "Parcela excluída com sucesso."})
+    finally:
+        con.close()
+
+
+@app.route("/api/parcelas/<int:parcela_id>/transmitir", methods=["POST"])
+def transmitir_parcela_tcerj(parcela_id):
+    """Atualiza o status da parcela para 'Enviado' simulando transmissão ao TCE-RJ."""
+    con = get_db_connection()
+    try:
+        p = con.execute("SELECT id FROM Parcelas WHERE id = ?", (parcela_id,)).fetchone()
+        if not p:
+            abort(404, description="Parcela não encontrada")
+
+        con.execute("""
+            UPDATE Parcelas
+            SET situacao_delib = 'Enviado', atualizado_em = datetime('now','localtime')
+            WHERE id = ?
+        """, (parcela_id,))
+        con.commit()
+        return jsonify({"mensagem": "Parcela transmitida com sucesso ao TCE-RJ (Situação: Enviado)!"})
+    finally:
+        con.close()
+
+
+@app.route("/api/cargos/<int:cargo_id>/parcelas", methods=["GET"])
+def parcelas_do_cargo(cargo_id):
+    """Retorna as parcelas da folha aplicáveis a um cargo específico."""
+    con = get_db_connection()
+    try:
+        rows = con.execute("""
+            SELECT p.*,
+                   CASE WHEN p.qualquer_cargo = 1 THEN 'Geral (Todos os Cargos)' ELSE 'Específica do Cargo' END AS abrangencia
+            FROM Parcelas p
+            WHERE p.qualquer_cargo = 1
+               OR p.id IN (SELECT parcela_id FROM ParcelasCargos WHERE cargo_id = ?)
+            ORDER BY CASE WHEN p.tipo = 'A Crédito' THEN 1 ELSE 2 END, CAST(p.codigo_fopag AS INTEGER) ASC, p.codigo_fopag ASC
         """, (cargo_id,)).fetchall()
         return jsonify([dict(r) for r in rows])
     finally:

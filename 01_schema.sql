@@ -332,4 +332,86 @@ CREATE TABLE IF NOT EXISTS HistoricoExoneracoes (
     criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
+-- =============================================================================
+-- BLOCO 10 — MÓDULO DE PARCELAS: Deliberação 359 TCE/RJ
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS Parcelas (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo_fopag        TEXT NOT NULL UNIQUE,
+    nome_norma          TEXT,
+    complemento         TEXT,
+    nome_fopag          TEXT,
+    tipo                TEXT NOT NULL CHECK (tipo IN ('A Crédito', 'A Débito')),
+    natureza            TEXT CHECK (natureza IN ('Remuneratória', 'Indenizatória', NULL)),
+    carater             TEXT CHECK (carater IN ('Permanente', 'Transitória', NULL)),
+    incide_ir           TEXT CHECK (incide_ir IN ('Sim', 'Não', NULL)),
+    incide_previdencia  TEXT CHECK (incide_previdencia IN ('Sim', 'Não', 'Facultativo', NULL)),
+    incide_teto         TEXT CHECK (incide_teto IN ('Sim', 'Não', NULL)),
+    natureza_rubrica    TEXT,
+    incorporavel        INTEGER NOT NULL DEFAULT 0,
+    forma_calculo       TEXT NOT NULL DEFAULT 'Percentual' CHECK (forma_calculo IN (
+                            'Percentual',
+                            'Percentual Variável',
+                            'Valor Nominal Fixo',
+                            'Valor Nominal Variável',
+                            'Percentual sobre o Salário Mínimo Nacional'
+                        )),
+    valor_percentual    REAL DEFAULT NULL,
+    valor_nominal       REAL DEFAULT NULL,
+    norma_desconhecida  INTEGER NOT NULL DEFAULT 0,
+    data_criacao        TEXT,
+    situacao            TEXT NOT NULL DEFAULT 'Em vigor' CHECK (situacao IN ('Em vigor', 'Em extinção', 'Extinta', 'Revogada')),
+    qualquer_cargo      INTEGER NOT NULL DEFAULT 0,
+    situacao_delib      TEXT NOT NULL DEFAULT 'não enviado' CHECK (situacao_delib IN ('Enviado', 'salvo - em revisão', 'não enviado')),
+    criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_parcelas_codigo ON Parcelas (codigo_fopag);
+CREATE INDEX IF NOT EXISTS idx_parcelas_tipo   ON Parcelas (tipo);
+CREATE INDEX IF NOT EXISTS idx_parcelas_delib  ON Parcelas (situacao_delib);
+
+CREATE TABLE IF NOT EXISTS ParcelasBaseCalculo (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
+    parcela_base_id     INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
+    criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    UNIQUE (parcela_id, parcela_base_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pbc_parcela ON ParcelasBaseCalculo (parcela_id);
+
+CREATE TABLE IF NOT EXISTS ParcelasNormas (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
+    objeto              TEXT NOT NULL CHECK (objeto IN ('Criação', 'Alteração', 'Regulamentação', 'Extinção')),
+    tipo_norma         TEXT NOT NULL DEFAULT 'Lei',
+    numero              TEXT NOT NULL,
+    ano                 INTEGER,
+    dispositivo         TEXT,
+    lei_id              INTEGER REFERENCES LeisPertinentes (id) ON DELETE SET NULL,
+    detalhes            TEXT,
+    criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_pn_parcela ON ParcelasNormas (parcela_id);
+
+CREATE TABLE IF NOT EXISTS ParcelasCargos (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
+    cargo_id            INTEGER NOT NULL REFERENCES Cargos (id) ON DELETE CASCADE,
+    criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    UNIQUE (parcela_id, cargo_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pc_parcela ON ParcelasCargos (parcela_id);
+CREATE INDEX IF NOT EXISTS idx_pc_cargo   ON ParcelasCargos (cargo_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_parcelas_atualizado_em
+AFTER UPDATE ON Parcelas FOR EACH ROW
+BEGIN
+    UPDATE Parcelas SET atualizado_em = datetime('now','localtime') WHERE id = OLD.id;
+END;
+
 

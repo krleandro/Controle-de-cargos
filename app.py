@@ -273,7 +273,7 @@ def executar_migracao():
             CREATE TABLE IF NOT EXISTS ParcelasNormas (
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                 parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
-                objeto              TEXT NOT NULL CHECK (objeto IN ('Criação', 'Alteração', 'Regulamentação', 'Extinção')),
+                objeto              TEXT NOT NULL CHECK (objeto IN ('Criação', 'Alteração', 'Regulamentação', 'Extinção', 'Incorporação')),
                 tipo_norma         TEXT NOT NULL DEFAULT 'Lei',
                 numero              TEXT NOT NULL,
                 ano                 INTEGER,

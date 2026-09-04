@@ -2460,6 +2460,16 @@
         <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Natureza das Rubricas da Folha de Pagamento</label>
         <select class="form-control" id="p-natureza-rubrica" style="height: 38px; width: 100%;">
           <option value="">Selecione...</option>
+          <option value="1000 - Salário, vencimento, soldo">1000 - Salário, vencimento, soldo</option>
+          <option value="1001 - Adicional por tempo de serviço">1001 - Adicional por tempo de serviço</option>
+          <option value="1002 - Adicional noturno">1002 - Adicional noturno</option>
+          <option value="1003 - Horas extraordinárias">1003 - Horas extraordinárias</option>
+          <option value="1004 - Adicional de insalubridade">1004 - Adicional de insalubridade</option>
+          <option value="1005 - Adicional de periculosidade">1005 - Adicional de periculosidade</option>
+          <option value="1204 - Gratificação de função / Cargo em comissão">1204 - Gratificação de função / Cargo em comissão</option>
+          <option value="1212 - Gratificações ou outras verbas de natureza permanente">1212 - Gratificações ou outras verbas de natureza permanente</option>
+          <option value="1401 - Abono">1401 - Abono</option>
+          <option value="1409 - Outros abonos">1409 - Outros abonos</option>
           <option value="Vencimento / Salário Base">Vencimento / Salário Base</option>
           <option value="Gratificação de Função / Cargo em Comissão">Gratificação de Função / Cargo em Comissão</option>
           <option value="Adicional por Tempo de Serviço (Triênio/Quinquênio)">Adicional por Tempo de Serviço (Triênio/Quinquênio)</option>
@@ -2653,6 +2663,7 @@
           <option value="Criação">Criação</option>
           <option value="Alteração">Alteração</option>
           <option value="Regulamentação">Regulamentação</option>
+          <option value="Incorporação">Incorporação</option>
           <option value="Extinção">Extinção</option>
         </select>
       </div>
@@ -2660,6 +2671,7 @@
       <div class="form-group">
         <label>Tipo de Norma / Processo: *</label>
         <select class="form-control" id="pn-tipo-norma">
+          <option value="Lei ordinária Municipal">Lei Ordinária Municipal</option>
           <option value="Lei">Lei Ordinária</option>
           <option value="Lei Complementar">Lei Complementar</option>
           <option value="Decreto">Decreto</option>
@@ -5586,8 +5598,14 @@ async function abrirModalEditarParcela(id) {
     $('p-codigo-fopag').value = p.codigo_fopag || '';
     $('p-nome-norma').value = p.nome_norma || '';
     $('p-complemento').value = p.complemento || '';
-    $('p-nome-fopag').value = p.nome_fopag || '';
-    $('p-natureza-rubrica').value = p.natureza_rubrica || '';
+    const rubSelect = $('p-natureza-rubrica');
+    if (p.natureza_rubrica && !Array.from(rubSelect.options).some(o => o.value === p.natureza_rubrica)) {
+      const opt = document.createElement('option');
+      opt.value = p.natureza_rubrica;
+      opt.textContent = p.natureza_rubrica;
+      rubSelect.appendChild(opt);
+    }
+    rubSelect.value = p.natureza_rubrica || '';
     $('p-incorporavel').checked = !!p.incorporavel;
     $('p-valor-percentual').value = p.valor_percentual != null ? p.valor_percentual : '';
     $('p-valor-nominal').value = p.valor_nominal != null ? p.valor_nominal : '';

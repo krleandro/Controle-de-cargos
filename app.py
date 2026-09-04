@@ -31,14 +31,10 @@ def remove_accents(text):
 
 
 def _popular_parcelas_iniciais(con):
-    """Popula automaticamente as parcelas da Deliberação 359 caso a tabela esteja vazia."""
+    """Garante que as parcelas padrão da Deliberação 359 existam no banco, inserindo as que faltarem."""
     try:
         cur = con.cursor()
-        cur.execute("SELECT COUNT(*) FROM Parcelas")
-        if cur.fetchone()[0] > 0:
-            return
-
-        print("[MIGRAÇÃO] Populando parcelas iniciais da Deliberação 359 TCE/RJ...")
+        print("[MIGRAÇÃO] Verificando integridade das parcelas da Deliberação 359 TCE/RJ...")
         parcelas_data = [
             {
                 "codigo_fopag": "1",
@@ -221,8 +217,13 @@ def _popular_parcelas_iniciais(con):
         for cid, cnome in cur.fetchall():
             cargo_map[cnome.strip().lower()] = cid
 
-        created = {}
+        novas_inseridas = 0
         for p in parcelas_data:
+            cur.execute("SELECT id FROM Parcelas WHERE codigo_fopag = ?", (p["codigo_fopag"],))
+            row = cur.fetchone()
+            if row:
+                continue
+
             cur.execute("""
                 INSERT INTO Parcelas (
                     codigo_fopag, nome_norma, complemento, nome_fopag,
@@ -241,7 +242,7 @@ def _popular_parcelas_iniciais(con):
                 p["data_criacao"], p["situacao"], p["qualquer_cargo"], p["situacao_delib"]
             ))
             pid = cur.lastrowid
-            created[p["codigo_fopag"]] = pid
+            novas_inseridas += 1
 
             for n in p["normas"]:
                 cur.execute("""
@@ -265,12 +266,19 @@ def _popular_parcelas_iniciais(con):
                     cur.execute("INSERT OR IGNORE INTO ParcelasCargos (parcela_id, cargo_id) VALUES (?, ?)", (pid, cid))
 
         for p in parcelas_data:
-            pid = created[p["codigo_fopag"]]
+            cur.execute("SELECT id FROM Parcelas WHERE codigo_fopag = ?", (p["codigo_fopag"],))
+            row_p = cur.fetchone()
+            if not row_p:
+                continue
+            pid = row_p[0]
             for bcod in p["base_calculo_codigos"]:
-                if bcod in created:
-                    cur.execute("INSERT OR IGNORE INTO ParcelasBaseCalculo (parcela_id, parcela_base_id) VALUES (?, ?)", (pid, created[bcod]))
+                cur.execute("SELECT id FROM Parcelas WHERE codigo_fopag = ?", (bcod,))
+                row_b = cur.fetchone()
+                if row_b:
+                    cur.execute("INSERT OR IGNORE INTO ParcelasBaseCalculo (parcela_id, parcela_base_id) VALUES (?, ?)", (pid, row_b[0]))
 
-        print(f"[MIGRAÇÃO] {len(created)} parcelas iniciais inseridas com sucesso.")
+        if novas_inseridas > 0:
+            print(f"[MIGRAÇÃO] {novas_inseridas} novas parcelas cadastradas com sucesso.")
     except Exception as e:
         print(f"[ERRO MIGRAÇÃO PARCELAS INICIAIS] {e}")
 

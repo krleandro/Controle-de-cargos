@@ -1,4 +1,4 @@
-import sqlite3, os, traceback, unicodedata, difflib
+import sqlite3, os, traceback, unicodedata, difflib, json
 from pathlib import Path
 from datetime import datetime
 
@@ -558,6 +558,24 @@ def executar_migracao():
         _popular_parcelas_iniciais(con)
         con.commit()
         print("[MIGRAÇÃO] Tabelas do Módulo de Parcelas criadas/verificadas com sucesso.")
+
+        # Criar tabela HistoricoAlteracoesCargos (Auditoria de alterações por cargo)
+        con.executescript("""
+            CREATE TABLE IF NOT EXISTS HistoricoAlteracoesCargos (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                cargo_id            INTEGER NOT NULL REFERENCES Cargos (id) ON DELETE CASCADE,
+                usuario             TEXT    DEFAULT 'sistema',
+                acao                TEXT    NOT NULL,
+                resumo              TEXT,
+                alteracoes_json     TEXT,
+                criado_em           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_hac_cargo_id  ON HistoricoAlteracoesCargos (cargo_id);
+            CREATE INDEX IF NOT EXISTS idx_hac_criado_em ON HistoricoAlteracoesCargos (criado_em DESC);
+        """)
+        con.commit()
+        print("[MIGRAÇÃO] Tabela HistoricoAlteracoesCargos verificada/criada.")
     except Exception as e:
         print(f"[ERRO MIGRAÇÃO] Falha ao rodar migrações: {e}")
     finally:
@@ -629,6 +647,51 @@ def get_db_connection():
     con.create_function("remove_accents", 1, remove_accents)
     return con
 
+
+# ── Auditoria de Alterações de Cargos ─────────────────────────────────────────
+CAMPOS_CARGO_LABELS = {
+    "nome": "Nome do Cargo",
+    "codigo_fopag": "Código FOPAG",
+    "situacao": "Situação",
+    "situacao_delib": "Situação Delib. 359",
+    "tipo_provimento": "Tipo de Provimento",
+    "escolaridade": "Escolaridade",
+    "carga_horaria": "Carga Horária",
+    "simbolo_vencimento": "Símbolo de Vencimento",
+    "total_previstos": "Total Previstos",
+    "total_ocupados": "Total Ocupados",
+    "atribuicoes": "Atribuições",
+    "recrutamento": "Recrutamento",
+    "restricao_exigencia": "Restrição / Exigência",
+    "fonte_carga_horaria": "Fonte da Carga Horária",
+    "fonte_atribuicoes": "Fonte das Atribuições",
+    "secretaria": "Secretaria Vinculada",
+}
+
+def _norm_audit_val(val):
+    if val is None:
+        return None
+    if isinstance(val, str):
+        v = val.strip()
+        return v if v != "" else None
+    return val
+
+def registrar_alteracao_cargo(con, cargo_id, acao, alteracoes=None, resumo=None, atualizar_timestamp=True):
+    """Registra uma alteração detalhada no histórico do cargo e atualiza atualizado_em."""
+    try:
+        usuario = session.get("usuario", "sistema")
+    except RuntimeError:
+        usuario = "sistema"
+
+    alteracoes_json = json.dumps(alteracoes or [], ensure_ascii=False)
+    con.execute("""
+        INSERT INTO HistoricoAlteracoesCargos (cargo_id, usuario, acao, resumo, alteracoes_json)
+        VALUES (?, ?, ?, ?, ?)
+    """, (cargo_id, usuario, acao, resumo, alteracoes_json))
+
+    if atualizar_timestamp:
+        con.execute("UPDATE Cargos SET atualizado_em = datetime('now','localtime') WHERE id = ?", (cargo_id,))
+
 from werkzeug.exceptions import HTTPException
 
 # ── Handler global de exceções ─────────────────────────────────────────────────
@@ -667,26 +730,68 @@ def get_stats():
 
 @app.route("/api/cargos", methods=["GET"])
 def listar_cargos():
-    """Lista todos os cargos com saldo calculado."""
+    """Lista todos os cargos com saldo calculado e contagem de alterações."""
     situacao = request.args.get("situacao")
     tipo = request.args.get("tipo")
     q = request.args.get("q")
     
-    sql = "SELECT * FROM vw_SaldoVagas WHERE 1=1"
+    sql = """
+        SELECT v.*,
+               (SELECT COUNT(*) FROM HistoricoAlteracoesCargos h WHERE h.cargo_id = v.id) AS total_alteracoes
+        FROM vw_SaldoVagas v
+        WHERE 1=1
+    """
     params = []
     if situacao and situacao != "Todos":
-        sql += " AND situacao = ?"; params.append(situacao)
+        sql += " AND v.situacao = ?"; params.append(situacao)
     if tipo and tipo != "Todos":
-        sql += " AND tipo_provimento = ?"; params.append(tipo)
+        sql += " AND v.tipo_provimento = ?"; params.append(tipo)
     if q:
-        sql += " AND (remove_accents(nome) LIKE remove_accents(?) OR remove_accents(codigo_fopag) LIKE remove_accents(?))"
+        sql += " AND (remove_accents(v.nome) LIKE remove_accents(?) OR remove_accents(v.codigo_fopag) LIKE remove_accents(?))"
         params += [f"%{q}%", f"%{q}%"]
-    sql += " ORDER BY nome COLLATE NOCASE"
+    sql += " ORDER BY v.nome COLLATE NOCASE"
     
     con = get_db_connection()
     try:
         rows = con.execute(sql, params).fetchall()
         return jsonify([dict(r) for r in rows])
+    finally:
+        con.close()
+
+
+@app.route("/api/cargos/<int:cargo_id>/historico", methods=["GET"])
+def historico_alteracoes_cargo(cargo_id):
+    """Retorna o histórico completo de alterações registradas para um cargo."""
+    con = get_db_connection()
+    try:
+        cargo = con.execute(
+            "SELECT id, nome, codigo_fopag, criado_em, atualizado_em FROM Cargos WHERE id = ?",
+            (cargo_id,)
+        ).fetchone()
+        if not cargo:
+            abort(404, description="Cargo não encontrado")
+
+        rows = con.execute("""
+            SELECT id, cargo_id, usuario, acao, resumo, alteracoes_json, criado_em
+            FROM HistoricoAlteracoesCargos
+            WHERE cargo_id = ?
+            ORDER BY criado_em DESC, id DESC
+        """, (cargo_id,)).fetchall()
+
+        alteracoes = []
+        for r in rows:
+            item = dict(r)
+            try:
+                item["alteracoes"] = json.loads(item.get("alteracoes_json") or "[]")
+            except Exception:
+                item["alteracoes"] = []
+            item.pop("alteracoes_json", None)
+            alteracoes.append(item)
+
+        return jsonify({
+            "cargo": dict(cargo),
+            "alteracoes": alteracoes
+        })
     finally:
         con.close()
 
@@ -745,20 +850,48 @@ def criar_cargo():
             dados.get("fonte_carga_horaria"), dados.get("fonte_atribuicoes"),
             dados.get("secretaria")
         ))
+        novo_id = cur.lastrowid
+        iniciais = []
+        for campo, label in CAMPOS_CARGO_LABELS.items():
+            val = _norm_audit_val(dados.get(campo))
+            if val is not None:
+                iniciais.append({"campo": label, "anterior": None, "novo": val})
+        registrar_alteracao_cargo(
+            con, novo_id, "Criação de Cargo",
+            alteracoes=iniciais,
+            resumo=f"Cargo '{dados.get('nome')}' cadastrado no sistema.",
+            atualizar_timestamp=False
+        )
         con.commit()
-        return jsonify({"id": cur.lastrowid, "mensagem": "Cargo criado com sucesso."}), 201
+        return jsonify({"id": novo_id, "mensagem": "Cargo criado com sucesso."}), 201
     finally:
         con.close()
 
 @app.route("/api/cargos/<int:cargo_id>", methods=["PUT"])
 def atualizar_cargo(cargo_id):
-    """Atualiza os dados de um cargo existente."""
+    """Atualiza os dados de um cargo existente e registra os campos alterados."""
     dados = request.get_json()
     con = get_db_connection()
     try:
-        cargo = con.execute("SELECT id FROM Cargos WHERE id=?", (cargo_id,)).fetchone()
+        cargo = con.execute("SELECT * FROM Cargos WHERE id=?", (cargo_id,)).fetchone()
         if not cargo:
             abort(404, description="Cargo não encontrado")
+
+        cargo_atual = dict(cargo)
+        alteracoes = []
+        for campo, label in CAMPOS_CARGO_LABELS.items():
+            val_ant = _norm_audit_val(cargo_atual.get(campo))
+            val_nov = _norm_audit_val(dados.get(campo))
+            if str(val_ant) != str(val_nov):
+                alteracoes.append({
+                    "campo": label,
+                    "anterior": val_ant,
+                    "novo": val_nov
+                })
+
+        if not alteracoes:
+            return jsonify({"mensagem": "Nenhuma alteração detectada."})
+
         con.execute("""
             UPDATE Cargos SET
               nome=?, codigo_fopag=?, situacao=?, situacao_delib=?, tipo_provimento=?, escolaridade=?,
@@ -775,6 +908,12 @@ def atualizar_cargo(cargo_id):
             dados.get("fonte_carga_horaria"), dados.get("fonte_atribuicoes"),
             dados.get("secretaria"), cargo_id
         ))
+        registrar_alteracao_cargo(
+            con, cargo_id, "Edição de Cargo",
+            alteracoes=alteracoes,
+            resumo=f"{len(alteracoes)} campo(s) alterado(s).",
+            atualizar_timestamp=True
+        )
         con.commit()
         return jsonify({"mensagem": "Cargo atualizado."})
     finally:
@@ -838,8 +977,9 @@ def mesclar_cargos():
         # 3. Transferir FontesCargaHoraria
         con.execute("UPDATE FontesCargaHoraria SET cargo_id = ? WHERE cargo_id = ?", (cargo_destino_id, cargo_origem_id))
 
-        # 4. Transferir HistoricoExoneracoes
+        # 4. Transferir HistoricoExoneracoes e HistoricoAlteracoesCargos
         con.execute("UPDATE HistoricoExoneracoes SET cargo_id = ? WHERE cargo_id = ?", (cargo_destino_id, cargo_origem_id))
+        con.execute("UPDATE HistoricoAlteracoesCargos SET cargo_id = ? WHERE cargo_id = ?", (cargo_destino_id, cargo_origem_id))
 
         # 5. Preencher campos em branco no destino com valores da origem
         campos_para_preencher = [
@@ -880,6 +1020,26 @@ def mesclar_cargos():
 
         sql_update = f"UPDATE Cargos SET {', '.join(set_clauses)} WHERE id = ?"
         con.execute(sql_update, set_values)
+
+        # Registra alteração da mesclagem no histórico do cargo destino
+        alteracoes_merge = []
+        for k, v in updates.items():
+            if k == "atualizado_em":
+                continue
+            val_ant = _norm_audit_val(dest_dict.get(k))
+            val_nov = _norm_audit_val(v)
+            if str(val_ant) != str(val_nov):
+                alteracoes_merge.append({
+                    "campo": CAMPOS_CARGO_LABELS.get(k, k),
+                    "anterior": val_ant,
+                    "novo": val_nov
+                })
+        registrar_alteracao_cargo(
+            con, cargo_destino_id, "Mesclagem de Cargos",
+            alteracoes=alteracoes_merge,
+            resumo=f"Cargo duplicado '{orig_dict['nome']}' (ID {cargo_origem_id}) mesclado neste cargo.",
+            atualizar_timestamp=True
+        )
 
         # 8. Excluir o cargo origem (duplicado)
         con.execute("DELETE FROM Cargos WHERE id = ?", (cargo_origem_id,))
@@ -931,16 +1091,24 @@ def atualizar_ocupados(cargo_id):
     dados = request.get_json()
     con = get_db_connection()
     try:
-        cargo = con.execute("SELECT total_previstos FROM Cargos WHERE id=?", (cargo_id,)).fetchone()
+        cargo = con.execute("SELECT total_previstos, total_ocupados FROM Cargos WHERE id=?", (cargo_id,)).fetchone()
         if not cargo:
             abort(404, description="Cargo não encontrado")
             
         total_ocupados = max(0, dados.get("total_ocupados", 0))
-        con.execute(
-            "UPDATE Cargos SET total_ocupados=? WHERE id=?",
-            (total_ocupados, cargo_id)
-        )
-        con.commit()
+        ocup_ant = cargo["total_ocupados"]
+        if total_ocupados != ocup_ant:
+            con.execute(
+                "UPDATE Cargos SET total_ocupados=? WHERE id=?",
+                (total_ocupados, cargo_id)
+            )
+            registrar_alteracao_cargo(
+                con, cargo_id, "Alteração de Ocupados",
+                alteracoes=[{"campo": "Total Ocupados", "anterior": ocup_ant, "novo": total_ocupados}],
+                resumo=f"Vagas ocupadas ajustadas de {ocup_ant} para {total_ocupados}.",
+                atualizar_timestamp=True
+            )
+            con.commit()
         saldo = cargo["total_previstos"] - total_ocupados
         return jsonify({"saldo_novo": saldo})
     finally:
@@ -993,6 +1161,21 @@ def registrar_lei(cargo_id):
             VALUES (?,?,?,?,?,?)
         """, (cargo_id, lei.get("numero"), lei.get("ano"), lei.get("descricao"), acao,
               quantidade if acao in ACOES_COM_QTD else None))
+
+        alteracoes_lei = [
+            {"campo": "Lei Pertinente", "anterior": None, "novo": f"Lei nº {lei.get('numero')}/{lei.get('ano')} ({acao}{f': {quantidade} vaga(s)' if acao in ACOES_COM_QTD else ''})"}
+        ]
+        if lei.get("descricao"):
+            alteracoes_lei.append({"campo": "Ementa / Descrição da Lei", "anterior": None, "novo": lei.get("descricao")})
+        if novo_prev != prev_antes:
+            alteracoes_lei.append({"campo": "Total Previstos", "anterior": prev_antes, "novo": novo_prev})
+
+        registrar_alteracao_cargo(
+            con, cargo_id, "Lei Registrada",
+            alteracoes=alteracoes_lei,
+            resumo=f"Registrada Lei {lei.get('numero')}/{lei.get('ano')} ({acao}).",
+            atualizar_timestamp=True
+        )
               
         con.commit()
 
@@ -1025,12 +1208,14 @@ def atualizar_lei(cargo_id, lei_id):
     con = get_db_connection()
     try:
         # Pega a lei antiga para comparar e reverter o impacto no cargo
-        lei_antiga = con.execute("SELECT acao, quantidade FROM LeisPertinentes WHERE id=? AND cargo_id=?", (lei_id, cargo_id)).fetchone()
+        lei_antiga = con.execute("SELECT numero, ano, descricao, acao, quantidade FROM LeisPertinentes WHERE id=? AND cargo_id=?", (lei_id, cargo_id)).fetchone()
         if not lei_antiga:
             abort(404, description="Lei não encontrada")
 
         acao_antiga = lei_antiga["acao"]
         qtd_antiga = lei_antiga["quantidade"]
+        prev_antes_lei = None
+        novo_prev_lei = None
 
         # Só altera as vagas se houve mudança real de acao ou de quantidade
         alterou_quantitativo = (acao != acao_antiga) or (quantidade != qtd_antiga)
@@ -1039,7 +1224,8 @@ def atualizar_lei(cargo_id, lei_id):
             cargo = con.execute("SELECT id, total_previstos, total_ocupados FROM Cargos WHERE id=?", (cargo_id,)).fetchone()
             
             # Desfaz o impacto da lei antiga
-            prev_atual = cargo["total_previstos"]
+            prev_antes_lei = cargo["total_previstos"]
+            prev_atual = prev_antes_lei
             qtd_antiga_val = qtd_antiga or 0
             
             if acao_antiga == "Cria":
@@ -1058,15 +1244,39 @@ def atualizar_lei(cargo_id, lei_id):
             else:
                 novo_prev = prev_atual
 
+            novo_prev_lei = novo_prev
             if novo_prev != cargo["total_previstos"]:
                 con.execute("UPDATE Cargos SET total_previstos=? WHERE id=?", (novo_prev, cargo_id))
 
+        nova_qtd = quantidade if acao in ACOES_COM_QTD else None
         con.execute("""
             UPDATE LeisPertinentes SET
               numero=?, ano=?, descricao=?, acao=?, quantidade=?
             WHERE id=? AND cargo_id=?
         """, (lei.get("numero"), lei.get("ano"), lei.get("descricao"), acao,
-              quantidade if acao in ACOES_COM_QTD else None, lei_id, cargo_id))
+              nova_qtd, lei_id, cargo_id))
+
+        alteracoes_lei = []
+        campos_lei = [
+            ("numero", "Número da Lei", lei_antiga["numero"], lei.get("numero")),
+            ("ano", "Ano da Lei", lei_antiga["ano"], lei.get("ano")),
+            ("acao", "Ação da Lei", acao_antiga, acao),
+            ("quantidade", "Quantidade (Lei)", qtd_antiga, nova_qtd),
+            ("descricao", "Descrição da Lei", lei_antiga["descricao"], lei.get("descricao")),
+        ]
+        for _, lbl, vant, vnov in campos_lei:
+            if str(_norm_audit_val(vant)) != str(_norm_audit_val(vnov)):
+                alteracoes_lei.append({"campo": lbl, "anterior": _norm_audit_val(vant), "novo": _norm_audit_val(vnov)})
+        if prev_antes_lei is not None and novo_prev_lei is not None and prev_antes_lei != novo_prev_lei:
+            alteracoes_lei.append({"campo": "Total Previstos", "anterior": prev_antes_lei, "novo": novo_prev_lei})
+
+        if alteracoes_lei:
+            registrar_alteracao_cargo(
+                con, cargo_id, "Lei Atualizada",
+                alteracoes=alteracoes_lei,
+                resumo=f"Atualizada Lei {lei.get('numero')}/{lei.get('ano')}.",
+                atualizar_timestamp=True
+            )
               
         con.commit()
         return jsonify({"mensagem": "Lei atualizada com sucesso."})
@@ -1078,13 +1288,14 @@ def deletar_lei(cargo_id, lei_id):
     """Deleta uma lei pertinente."""
     con = get_db_connection()
     try:
-        lei_antiga = con.execute("SELECT acao, quantidade FROM LeisPertinentes WHERE id=? AND cargo_id=?", (lei_id, cargo_id)).fetchone()
+        lei_antiga = con.execute("SELECT numero, ano, descricao, acao, quantidade FROM LeisPertinentes WHERE id=? AND cargo_id=?", (lei_id, cargo_id)).fetchone()
         if not lei_antiga:
             abort(404, description="Lei não encontrada")
 
         cargo = con.execute("SELECT id, total_previstos FROM Cargos WHERE id=?", (cargo_id,)).fetchone()
         
-        prev_atual = cargo["total_previstos"]
+        prev_antes = cargo["total_previstos"]
+        prev_atual = prev_antes
         acao_antiga = lei_antiga["acao"]
         qtd_antiga = lei_antiga["quantidade"] or 0
         
@@ -1093,10 +1304,22 @@ def deletar_lei(cargo_id, lei_id):
         elif acao_antiga == "Extingue":
             prev_atual = prev_atual + qtd_antiga
 
-        if prev_atual != cargo["total_previstos"]:
+        if prev_atual != prev_antes:
             con.execute("UPDATE Cargos SET total_previstos=? WHERE id=?", (prev_atual, cargo_id))
 
         con.execute("DELETE FROM LeisPertinentes WHERE id=? AND cargo_id=?", (lei_id, cargo_id))
+
+        alteracoes_lei = [
+            {"campo": "Lei Pertinente", "anterior": f"Lei nº {lei_antiga['numero']}/{lei_antiga['ano']} ({acao_antiga})", "novo": None}
+        ]
+        if prev_atual != prev_antes:
+            alteracoes_lei.append({"campo": "Total Previstos", "anterior": prev_antes, "novo": prev_atual})
+        registrar_alteracao_cargo(
+            con, cargo_id, "Lei Excluída",
+            alteracoes=alteracoes_lei,
+            resumo=f"Excluída Lei {lei_antiga['numero']}/{lei_antiga['ano']}.",
+            atualizar_timestamp=True
+        )
         con.commit()
         return jsonify({"mensagem": "Lei excluída com sucesso."})
     finally:
@@ -1585,6 +1808,16 @@ def criar_ocupante():
             dados.get("simbolo_vencimento"), dados.get("portaria"),
             dados.get("boletim_oficial"), dados.get("data_nomeacao")
         ))
+        registrar_alteracao_cargo(
+            con, cargo_id, "Ocupante Nomeado",
+            alteracoes=[
+                {"campo": "Servidor Nomeado", "anterior": None, "novo": f"{nome} (Mat. {matricula})"},
+                *([{"campo": "Portaria", "anterior": None, "novo": dados.get("portaria")}] if dados.get("portaria") else []),
+                *([{"campo": "Data de Nomeação", "anterior": None, "novo": dados.get("data_nomeacao")}] if dados.get("data_nomeacao") else [])
+            ],
+            resumo=f"Nomeado ocupante {nome} (Matrícula {matricula}).",
+            atualizar_timestamp=True
+        )
         con.commit()
         return jsonify({"id": cur.lastrowid, "mensagem": "Ocupante cadastrado com sucesso."}), 201
     finally:
@@ -1603,9 +1836,10 @@ def atualizar_ocupante(ocupante_id):
         
     con = get_db_connection()
     try:
-        ocupante = con.execute("SELECT id FROM Ocupantes WHERE id = ?", (ocupante_id,)).fetchone()
+        ocupante = con.execute("SELECT * FROM Ocupantes WHERE id = ?", (ocupante_id,)).fetchone()
         if not ocupante:
             abort(404, description="Ocupante não encontrado")
+        ocup_ant = dict(ocupante)
             
         cargo = con.execute("SELECT tipo_provimento FROM Cargos WHERE id = ?", (cargo_id,)).fetchone()
         if not cargo:
@@ -1626,6 +1860,39 @@ def atualizar_ocupante(ocupante_id):
             dados.get("boletim_oficial"), dados.get("data_nomeacao"),
             ocupante_id
         ))
+        campos_ocup = [
+            ("nome", "Nome do Ocupante", ocup_ant.get("nome"), nome),
+            ("matricula", "Matrícula", ocup_ant.get("matricula"), matricula),
+            ("tipo_recrutamento", "Recrutamento (Ocupante)", ocup_ant.get("tipo_recrutamento"), dados.get("tipo_recrutamento")),
+            ("simbolo_vencimento", "Símbolo (Ocupante)", ocup_ant.get("simbolo_vencimento"), dados.get("simbolo_vencimento")),
+            ("portaria", "Portaria", ocup_ant.get("portaria"), dados.get("portaria")),
+            ("boletim_oficial", "Boletim Oficial", ocup_ant.get("boletim_oficial"), dados.get("boletim_oficial")),
+            ("data_nomeacao", "Data de Nomeação", ocup_ant.get("data_nomeacao"), dados.get("data_nomeacao")),
+        ]
+        alt_ocup = []
+        for _, lbl, vant, vnov in campos_ocup:
+            if str(_norm_audit_val(vant)) != str(_norm_audit_val(vnov)):
+                alt_ocup.append({"campo": lbl, "anterior": _norm_audit_val(vant), "novo": _norm_audit_val(vnov)})
+        if str(ocup_ant.get("cargo_id")) != str(cargo_id):
+            registrar_alteracao_cargo(
+                con, ocup_ant["cargo_id"], "Ocupante Transferido (Saída)",
+                alteracoes=[{"campo": "Ocupante", "anterior": f"{ocup_ant['nome']} (Mat. {ocup_ant['matricula']})", "novo": "Transferido para outro cargo"}],
+                resumo=f"Ocupante {ocup_ant['nome']} transferido para outro cargo.",
+                atualizar_timestamp=True
+            )
+            registrar_alteracao_cargo(
+                con, cargo_id, "Ocupante Transferido (Entrada)",
+                alteracoes=[{"campo": "Ocupante", "anterior": None, "novo": f"{nome} (Mat. {matricula})"}, *alt_ocup],
+                resumo=f"Ocupante {nome} transferido para este cargo.",
+                atualizar_timestamp=True
+            )
+        elif alt_ocup:
+            registrar_alteracao_cargo(
+                con, cargo_id, "Ocupante Atualizado",
+                alteracoes=alt_ocup,
+                resumo=f"Dados do ocupante {nome} atualizados.",
+                atualizar_timestamp=True
+            )
         con.commit()
         return jsonify({"mensagem": "Ocupante atualizado com sucesso."})
     finally:
@@ -1636,11 +1903,17 @@ def deletar_ocupante(ocupante_id):
     """Exonera (remove) um ocupante."""
     con = get_db_connection()
     try:
-        ocupante = con.execute("SELECT id, cargo_id FROM Ocupantes WHERE id = ?", (ocupante_id,)).fetchone()
+        ocupante = con.execute("SELECT id, cargo_id, nome, matricula FROM Ocupantes WHERE id = ?", (ocupante_id,)).fetchone()
         if not ocupante:
             abort(404, description="Ocupante não encontrado")
             
         con.execute("DELETE FROM Ocupantes WHERE id = ?", (ocupante_id,))
+        registrar_alteracao_cargo(
+            con, ocupante["cargo_id"], "Ocupante Removido",
+            alteracoes=[{"campo": "Ocupante", "anterior": f"{ocupante['nome']} (Mat. {ocupante['matricula']})", "novo": None}],
+            resumo=f"Ocupante {ocupante['nome']} removido do cargo.",
+            atualizar_timestamp=True
+        )
         con.commit()
         return jsonify({"mensagem": "Ocupante exonerado/excluído com sucesso."})
     finally:
@@ -1689,6 +1962,16 @@ def exonerar_ocupante_com_historico(ocupante_id):
 
         # Deleta de Ocupantes (isso também atualiza total_ocupados no cargo via trigger)
         con.execute("DELETE FROM Ocupantes WHERE id = ?", (ocupante_id,))
+        registrar_alteracao_cargo(
+            con, ocup["cargo_id"], "Ocupante Exonerado",
+            alteracoes=[
+                {"campo": "Servidor Exonerado", "anterior": f"{ocup['nome']} (Mat. {ocup['matricula']})", "novo": "Exonerado"},
+                {"campo": "Data de Exoneração", "anterior": None, "novo": data_exoneracao},
+                {"campo": "Portaria de Exoneração", "anterior": None, "novo": portaria_exoneracao}
+            ],
+            resumo=f"Exonerado ocupante {ocup['nome']} (Portaria {portaria_exoneracao}).",
+            atualizar_timestamp=True
+        )
         con.commit()
         return jsonify({"mensagem": "Ocupante exonerado com sucesso e registrado no histórico."})
     finally:

@@ -481,6 +481,172 @@
     transform: scale(1.05);
   }
 
+  /* Botão de Data de Última Atualização na tabela */
+  .update-date-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--slate-50);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .update-date-btn:hover {
+    background: var(--bg-selected);
+    border-color: var(--blue-primary);
+    color: var(--blue-primary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+  .update-date-btn.has-history {
+    background: var(--bg-xlightblue, #eff6ff);
+    border-color: #bfdbfe;
+    color: var(--blue-primary);
+  }
+  .update-date-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--blue-primary);
+    flex-shrink: 0;
+  }
+
+  /* Modal Histórico de Alterações do Cargo */
+  .hist-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .hist-summary-box {
+    background: var(--slate-50);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+  }
+  .hist-summary-box label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+  }
+  .hist-summary-box span {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .hist-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 54vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .hist-card {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-left: 3.5px solid var(--blue-primary);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .hist-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .hist-acao-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--bg-selected);
+    color: var(--blue-primary);
+    border: 1px solid #bfdbfe;
+  }
+  .hist-acao-badge.criacao { background: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+  .hist-acao-badge.exclusao { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-border); }
+  .hist-acao-badge.lei { background: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
+  .hist-meta {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .hist-resumo {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+  .hist-diff-table {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .hist-diff-row {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 10px;
+    align-items: start;
+    background: var(--slate-50);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .hist-diff-campo {
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .hist-diff-vals {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    word-break: break-word;
+  }
+  .hist-val-old {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+    padding: 2px 7px;
+    border-radius: 5px;
+    text-decoration: line-through;
+    font-size: 11.5px;
+  }
+  .hist-val-arrow {
+    color: var(--text-muted);
+    font-weight: 700;
+  }
+  .hist-val-new {
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-weight: 600;
+    font-size: 11.5px;
+  }
+  @media (max-width: 640px) {
+    .hist-summary { grid-template-columns: 1fr; }
+    .hist-diff-row { grid-template-columns: 1fr; gap: 4px; }
+  }
+
   /* Table Footer */
   .table-footer {
     padding: 16px 20px;
@@ -1184,7 +1350,7 @@
               <th onclick="sortBy('situacao')">Situação <span class="sort-arrow hidden" id="arrow-situacao"></span></th>
               <th onclick="sortBy('situacao_delib')">Delib 359 <span class="sort-arrow hidden" id="arrow-situacao_delib"></span></th>
               <th onclick="sortBy('tipo_provimento')">Provimento <span class="sort-arrow hidden" id="arrow-tipo_provimento"></span></th>
-              <th onclick="sortBy('recrutamento')">Recrutamento <span class="sort-arrow hidden" id="arrow-recrutamento"></span></th>
+              <th onclick="sortBy('atualizado_em')">Última Atualização <span class="sort-arrow hidden" id="arrow-atualizado_em"></span></th>
               <th onclick="sortBy('restricao_exigencia')">Restrição / Exigência <span class="sort-arrow hidden" id="arrow-restricao_exigencia"></span></th>
               <th onclick="sortBy('carga_horaria')" class="td-center" title="Carga horária">CH <span class="sort-arrow hidden" id="arrow-carga_horaria"></span></th>
               <th onclick="sortBy('total_previstos')" class="td-center">Previstos <span class="sort-arrow hidden" id="arrow-total_previstos"></span></th>
@@ -1705,6 +1871,7 @@
         <div class="info-item"><label>Símbolo de Vencimento</label><span id="d-simb">—</span></div>
         <div class="info-item"><label>Escolaridade</label><span id="d-esc">—</span></div>
         <div class="info-item"><label>Recrutamento</label><span id="d-recrutamento">—</span></div>
+        <div class="info-item full-width"><label>Última Atualização no Sistema</label><span id="d-atualizado-em">—</span></div>
         <div class="info-item full-width"><label>Restrição/Exigência</label><span id="d-restricao">—</span></div>
         <div class="info-item full-width"><label>Fonte da CH</label><span id="d-fonte-ch">—</span></div>
         <div class="info-item full-width"><label>Fonte das atribuições</label><span id="d-fonte-atr">—</span></div>
@@ -2839,6 +3006,42 @@
   </div>
 </div>
 
+<!-- ── MODAL: HISTÓRICO DE ALTERAÇÕES DO CARGO ─────────────────────────── -->
+<div class="overlay" id="overlay-historico-cargo" onclick="if(event.target===this)fecharModalHistoricoCargo()">
+  <div class="modal" style="max-width: 680px; width: 95%;">
+    <div class="modal-header">
+      <div>
+        <h2>Histórico de Alterações</h2>
+        <p id="hc-cargo-sub" style="color:var(--text-secondary)">Carregando…</p>
+      </div>
+      <button class="close-btn" onclick="fecharModalHistoricoCargo()">×</button>
+    </div>
+
+    <div class="hist-summary">
+      <div class="hist-summary-box">
+        <label>Criado em</label>
+        <span id="hc-criado-em">—</span>
+      </div>
+      <div class="hist-summary-box">
+        <label>Última Atualização</label>
+        <span id="hc-atualizado-em" style="color:var(--blue-primary)">—</span>
+      </div>
+      <div class="hist-summary-box">
+        <label>Registros de Alteração</label>
+        <span id="hc-total-alt">0</span>
+      </div>
+    </div>
+
+    <div class="hist-list" id="hc-lista">
+      <div class="empty-state" style="padding:30px 16px"><span class="spin"></span> Carregando histórico…</div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="fecharModalHistoricoCargo()">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── TOAST ─────────────────────────────────────────────────────────────── -->
 <div id="toast"></div>
 
@@ -2923,6 +3126,31 @@ function formatarCH(ch) {
     return ch + 'h';
   }
   return ch;
+}
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatarDataHoraBR(isoStr) {
+  if (!isoStr) return { data: '—', hora: '', completa: '—' };
+  const s = String(isoStr).trim().replace('T', ' ');
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!m) return { data: s, hora: '', completa: s };
+  const [, ano, mes, dia, hh, mm] = m;
+  const data = `${dia}/${mes}/${ano}`;
+  const hora = hh && mm ? `${hh}:${mm}` : '';
+  return {
+    data,
+    hora,
+    completa: hora ? `${data} às ${hora}` : data
+  };
 }
 
 // ── Carregar stats ─────────────────────────────────────────────────────────
@@ -3024,7 +3252,16 @@ function renderTabela() {
         <td>${badgeSituacao(c.situacao)}</td>
         <td>${badgeDelib(c.situacao_delib || 'não enviado')}</td>
         <td style="color:var(--text-secondary);font-size:12px">${c.tipo_provimento}</td>
-        <td style="color:var(--text-secondary);font-size:12px">${c.recrutamento || '—'}</td>
+        <td>
+          ${(() => {
+            const dt = formatarDataHoraBR(c.atualizado_em);
+            const temHist = (c.total_alteracoes || 0) > 0;
+            const titleTxt = dt.completa !== '—'
+              ? `Última atualização em ${dt.completa}${temHist ? ` (${c.total_alteracoes} registro${c.total_alteracoes !== 1 ? 's' : ''})` : ''} — Clique para ver o que foi alterado`
+              : 'Clique para ver o histórico de alterações';
+            return `<button type="button" class="update-date-btn ${temHist ? 'has-history' : ''}" onclick="event.stopPropagation();abrirModalHistoricoCargo(${c.id})" title="${escapeHtml(titleTxt)}">${temHist ? '<span class="update-date-dot"></span>' : '🕒'} ${dt.data}</button>`;
+          })()}
+        </td>
         <td style="color:var(--text-secondary);font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c.restricao_exigencia || '—'}">${c.restricao_exigencia || '—'}</td>
         <td class="td-center" style="color:var(--text-secondary);font-size:12px">${formatarCH(c.carga_horaria)}</td>
         <td class="td-num">${c.total_previstos}</td>
@@ -3136,11 +3373,106 @@ function sortBy(key) {
   if (state.sortKey === key) {
     state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
   } else {
-    state.sortKey = key; state.sortDir = 'asc';
+    state.sortKey = key;
+    state.sortDir = (key === 'atualizado_em') ? 'desc' : 'asc';
   }
   const arrow = $('arrow-' + key);
   if (arrow) { arrow.classList.remove('hidden'); arrow.textContent = state.sortDir === 'asc' ? '↑' : '↓'; }
   renderView();
+}
+
+// ── Modal: Histórico de Alterações do Cargo ────────────────────────────────
+async function abrirModalHistoricoCargo(cargoId) {
+  const overlay = $('overlay-historico-cargo');
+  const lista = $('hc-lista');
+  $('hc-cargo-sub').textContent = 'Carregando…';
+  $('hc-criado-em').textContent = '—';
+  $('hc-atualizado-em').textContent = '—';
+  $('hc-total-alt').textContent = '—';
+  lista.innerHTML = `<div class="empty-state" style="padding:30px 16px"><span class="spin"></span> Carregando histórico…</div>`;
+  overlay.classList.add('show');
+
+  try {
+    const r = await apiFetch(`/api/cargos/${cargoId}/historico`);
+    if (!r.ok) throw new Error('Falha ao carregar histórico do cargo.');
+    const d = await r.json();
+    const c = d.cargo || {};
+    const alts = d.alteracoes || [];
+
+    $('hc-cargo-sub').textContent = `${c.nome || 'Cargo'}${c.codigo_fopag ? ` · Cód. FOPAG ${c.codigo_fopag}` : ''}`;
+    $('hc-criado-em').textContent = formatarDataHoraBR(c.criado_em).completa;
+    $('hc-atualizado-em').textContent = formatarDataHoraBR(c.atualizado_em).completa;
+    $('hc-total-alt').textContent = `${alts.length} registro${alts.length !== 1 ? 's' : ''}`;
+
+    if (!alts.length) {
+      const dtUlt = formatarDataHoraBR(c.atualizado_em).completa;
+      lista.innerHTML = `
+        <div style="background:var(--slate-50); border:1px dashed var(--border); border-radius:var(--radius-md); padding:22px 18px; text-align:center; color:var(--text-secondary);">
+          <div style="font-size:22px; margin-bottom:8px;">🕒</div>
+          <div style="font-weight:700; color:var(--text-primary); font-size:13.5px; margin-bottom:6px;">
+            Nenhuma alteração detalhada registrada ainda
+          </div>
+          <div style="font-size:12px; line-height:1.5;">
+            A última atualização deste cargo no banco ocorreu em <strong>${escapeHtml(dtUlt)}</strong> (antes da ativação do log detalhado de campos).<br>
+            Qualquer alteração realizada a partir de agora (edição do cargo, leis, vagas ou ocupantes) aparecerá discriminada aqui.
+          </div>
+        </div>`;
+      return;
+    }
+
+    const badgeCls = (acao) => {
+      const a = (acao || '').toLowerCase();
+      if (a.includes('criação') || a.includes('nomeado') || a.includes('entrada')) return 'criacao';
+      if (a.includes('exclu') || a.includes('exoner') || a.includes('remov') || a.includes('saída')) return 'exclusao';
+      if (a.includes('lei')) return 'lei';
+      return '';
+    };
+
+    const fmtVal = (v) => {
+      if (v === null || v === undefined || String(v).trim() === '') return 'Vazio';
+      return String(v);
+    };
+
+    lista.innerHTML = alts.map(item => {
+      const dt = formatarDataHoraBR(item.criado_em).completa;
+      const diffs = Array.isArray(item.alteracoes) ? item.alteracoes : [];
+      const diffHtml = diffs.length
+        ? `<div class="hist-diff-table">
+            ${diffs.map(df => {
+              const temAnt = df.anterior !== null && df.anterior !== undefined && String(df.anterior).trim() !== '';
+              const temNov = df.novo !== null && df.novo !== undefined && String(df.novo).trim() !== '';
+              return `
+                <div class="hist-diff-row">
+                  <div class="hist-diff-campo">${escapeHtml(df.campo || 'Campo')}</div>
+                  <div class="hist-diff-vals">
+                    ${temAnt ? `<span class="hist-val-old">${escapeHtml(fmtVal(df.anterior))}</span>` : `<span class="hist-val-old" style="opacity:0.65">Vazio</span>`}
+                    <span class="hist-val-arrow">→</span>
+                    ${temNov ? `<span class="hist-val-new">${escapeHtml(fmtVal(df.novo))}</span>` : `<span class="hist-val-new" style="background:var(--slate-100);color:var(--text-muted);border-color:var(--border)">Vazio</span>`}
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>`
+        : '';
+
+      return `
+        <div class="hist-card">
+          <div class="hist-card-head">
+            <span class="hist-acao-badge ${badgeCls(item.acao)}">${escapeHtml(item.acao || 'Alteração')}</span>
+            <span class="hist-meta">🕒 ${escapeHtml(dt)} · 👤 ${escapeHtml(item.usuario || 'sistema')}</span>
+          </div>
+          ${item.resumo ? `<div class="hist-resumo">${escapeHtml(item.resumo)}</div>` : ''}
+          ${diffHtml}
+        </div>`;
+    }).join('');
+  } catch (e) {
+    if (!e.isAuth) {
+      lista.innerHTML = `<div class="empty-state" style="color:var(--danger-text);padding:24px">Erro ao carregar histórico de alterações.</div>`;
+    }
+  }
+}
+
+function fecharModalHistoricoCargo() {
+  $('overlay-historico-cargo').classList.remove('show');
 }
 
 // ── Filtros ────────────────────────────────────────────────────────────────
@@ -3179,6 +3511,8 @@ async function abrirDrawer(cargoId, force = false) {
     $('d-prev').textContent    = c.total_previstos;
     $('d-ocup').textContent    = c.total_ocupados;
     $('d-recrutamento').textContent = c.recrutamento || '—';
+    const dtDrawer = formatarDataHoraBR(c.atualizado_em);
+    $('d-atualizado-em').innerHTML = `<button type="button" class="update-date-btn has-history" onclick="abrirModalHistoricoCargo(${c.id})" title="Clique para ver as informações alteradas">🕒 ${escapeHtml(dtDrawer.completa)} · Ver alterações</button>`;
     $('d-restricao').textContent    = c.restricao_exigencia || '—';
     $('d-fonte-ch').textContent     = c.fonte_carga_horaria || '—';
     $('d-fonte-atr').textContent    = c.fonte_atribuicoes || '—';
@@ -5195,6 +5529,7 @@ document.addEventListener('keydown', e => {
     fecharModalHistoricoExoneracoes();
     fecharModalMesclarCargo();
     fecharModalSugestoesDuplicados();
+    fecharModalHistoricoCargo();
   }
 });
 

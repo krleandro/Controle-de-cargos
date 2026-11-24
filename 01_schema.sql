@@ -415,3 +415,24 @@ BEGIN
 END;
 
 
+-- =============================================================================
+-- BLOCO 10 — HISTÓRICO DE ALTERAÇÕES DE CARGOS (AUDITORIA)
+-- Registra cada alteração realizada em um cargo (campos editados, leis,
+-- ocupantes, mesclagens), armazenando valor anterior e novo valor em JSON.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS HistoricoAlteracoesCargos (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    cargo_id            INTEGER NOT NULL REFERENCES Cargos (id) ON DELETE CASCADE,
+    usuario             TEXT    DEFAULT 'sistema',
+    acao                TEXT    NOT NULL,
+    resumo              TEXT,
+    alteracoes_json     TEXT,
+    criado_em           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_hac_cargo_id  ON HistoricoAlteracoesCargos (cargo_id);
+CREATE INDEX IF NOT EXISTS idx_hac_criado_em ON HistoricoAlteracoesCargos (criado_em DESC);
+
+
+

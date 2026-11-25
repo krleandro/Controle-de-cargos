@@ -1,6 +1,16 @@
 import sqlite3, os, traceback, unicodedata, difflib, json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+FUSO_BRASILIA = timezone(timedelta(hours=-3))
+
+def agora_brasilia() -> datetime:
+    """Retorna datetime atual no fuso horário de Brasília (UTC-3)."""
+    return datetime.now(FUSO_BRASILIA)
+
+def agora_brasilia_str() -> str:
+    """Retorna data/hora atual no padrão SQLite em fuso horário de Brasília (UTC-3)."""
+    return agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
 
 from flask import Flask, request, jsonify, send_file, render_template, abort, session
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -317,8 +327,8 @@ def executar_migracao():
                     total_previstos     INTEGER NOT NULL DEFAULT 0 CHECK (total_previstos >= 0),
                     total_ocupados      INTEGER NOT NULL DEFAULT 0 CHECK (total_ocupados >= 0),
                     atribuicoes         TEXT,
-                    criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-                    atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    criado_em           TEXT NOT NULL DEFAULT (datetime('now','-3 hours')),
+                    atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','-3 hours')),
                     recrutamento        TEXT,
                     restricao_exigencia TEXT,
                     fonte_carga_horaria TEXT,
@@ -345,7 +355,7 @@ def executar_migracao():
                 CREATE TRIGGER IF NOT EXISTS trg_cargos_atualizado_em
                 AFTER UPDATE ON Cargos FOR EACH ROW
                 BEGIN
-                    UPDATE Cargos SET atualizado_em = datetime('now','localtime') WHERE id = OLD.id;
+                    UPDATE Cargos SET atualizado_em = datetime('now','-3 hours') WHERE id = OLD.id;
                 END;
             """)
             
@@ -416,8 +426,8 @@ def executar_migracao():
                     portaria                TEXT,
                     boletim_oficial         TEXT,
                     data_nomeacao           TEXT,    -- YYYY-MM-DD
-                    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
-                    atualizado_em           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+                    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','-3 hours')),
+                    atualizado_em           TEXT    NOT NULL DEFAULT (datetime('now','-3 hours'))
                 );
                 
                 CREATE INDEX IF NOT EXISTS idx_ocupantes_cargo_id ON Ocupantes (cargo_id);
@@ -469,7 +479,7 @@ def executar_migracao():
                 data_exoneracao         TEXT    NOT NULL,  -- YYYY-MM-DD
                 portaria_exoneracao     TEXT    NOT NULL,
                 boletim_exoneracao      TEXT    NOT NULL,
-                criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+                criado_em               TEXT    NOT NULL DEFAULT (datetime('now','-3 hours'))
             );
         """)
         con.commit()
@@ -505,8 +515,8 @@ def executar_migracao():
                 situacao            TEXT NOT NULL DEFAULT 'Em vigor' CHECK (situacao IN ('Em vigor', 'Em extinção', 'Extinta', 'Revogada')),
                 qualquer_cargo      INTEGER NOT NULL DEFAULT 0,
                 situacao_delib      TEXT NOT NULL DEFAULT 'não enviado' CHECK (situacao_delib IN ('Enviado', 'salvo - em revisão', 'não enviado')),
-                criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-                atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+                criado_em           TEXT NOT NULL DEFAULT (datetime('now','-3 hours')),
+                atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','-3 hours'))
             );
 
             CREATE INDEX IF NOT EXISTS idx_parcelas_codigo ON Parcelas (codigo_fopag);
@@ -517,7 +527,7 @@ def executar_migracao():
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                 parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
                 parcela_base_id     INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
-                criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                criado_em           TEXT NOT NULL DEFAULT (datetime('now','-3 hours')),
                 UNIQUE (parcela_id, parcela_base_id)
             );
 
@@ -533,7 +543,7 @@ def executar_migracao():
                 dispositivo         TEXT,
                 lei_id              INTEGER REFERENCES LeisPertinentes (id) ON DELETE SET NULL,
                 detalhes            TEXT,
-                criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+                criado_em           TEXT NOT NULL DEFAULT (datetime('now','-3 hours'))
             );
 
             CREATE INDEX IF NOT EXISTS idx_pn_parcela ON ParcelasNormas (parcela_id);
@@ -542,7 +552,7 @@ def executar_migracao():
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                 parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
                 cargo_id            INTEGER NOT NULL REFERENCES Cargos (id) ON DELETE CASCADE,
-                criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                criado_em           TEXT NOT NULL DEFAULT (datetime('now','-3 hours')),
                 UNIQUE (parcela_id, cargo_id)
             );
 
@@ -552,7 +562,7 @@ def executar_migracao():
             CREATE TRIGGER IF NOT EXISTS trg_parcelas_atualizado_em
             AFTER UPDATE ON Parcelas FOR EACH ROW
             BEGIN
-                UPDATE Parcelas SET atualizado_em = datetime('now','localtime') WHERE id = OLD.id;
+                UPDATE Parcelas SET atualizado_em = datetime('now','-3 hours') WHERE id = OLD.id;
             END;
         """)
         _popular_parcelas_iniciais(con)
@@ -568,14 +578,30 @@ def executar_migracao():
                 acao                TEXT    NOT NULL,
                 resumo              TEXT,
                 alteracoes_json     TEXT,
-                criado_em           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+                criado_em           TEXT    NOT NULL DEFAULT (datetime('now','-3 hours'))
             );
 
             CREATE INDEX IF NOT EXISTS idx_hac_cargo_id  ON HistoricoAlteracoesCargos (cargo_id);
             CREATE INDEX IF NOT EXISTS idx_hac_criado_em ON HistoricoAlteracoesCargos (criado_em DESC);
+
+            -- Garante que triggers de atualização gravem sempre em horário de Brasília (UTC-3),
+            -- independentemente do fuso horário do servidor (ex: PythonAnywhere em UTC).
+            DROP TRIGGER IF EXISTS trg_cargos_atualizado_em;
+            CREATE TRIGGER trg_cargos_atualizado_em
+            AFTER UPDATE ON Cargos FOR EACH ROW
+            BEGIN
+                UPDATE Cargos SET atualizado_em = datetime('now','-3 hours') WHERE id = OLD.id;
+            END;
+
+            DROP TRIGGER IF EXISTS trg_parcelas_atualizado_em;
+            CREATE TRIGGER trg_parcelas_atualizado_em
+            AFTER UPDATE ON Parcelas FOR EACH ROW
+            BEGIN
+                UPDATE Parcelas SET atualizado_em = datetime('now','-3 hours') WHERE id = OLD.id;
+            END;
         """)
         con.commit()
-        print("[MIGRAÇÃO] Tabela HistoricoAlteracoesCargos verificada/criada.")
+        print("[MIGRAÇÃO] Tabela HistoricoAlteracoesCargos e triggers UTC-3 verificados/criados.")
     except Exception as e:
         print(f"[ERRO MIGRAÇÃO] Falha ao rodar migrações: {e}")
     finally:
@@ -677,20 +703,21 @@ def _norm_audit_val(val):
     return val
 
 def registrar_alteracao_cargo(con, cargo_id, acao, alteracoes=None, resumo=None, atualizar_timestamp=True):
-    """Registra uma alteração detalhada no histórico do cargo e atualiza atualizado_em."""
+    """Registra uma alteração detalhada no histórico do cargo e atualiza atualizado_em (horário de Brasília UTC-3)."""
     try:
         usuario = session.get("usuario", "sistema")
     except RuntimeError:
         usuario = "sistema"
 
+    agora = agora_brasilia_str()
     alteracoes_json = json.dumps(alteracoes or [], ensure_ascii=False)
     con.execute("""
-        INSERT INTO HistoricoAlteracoesCargos (cargo_id, usuario, acao, resumo, alteracoes_json)
-        VALUES (?, ?, ?, ?, ?)
-    """, (cargo_id, usuario, acao, resumo, alteracoes_json))
+        INSERT INTO HistoricoAlteracoesCargos (cargo_id, usuario, acao, resumo, alteracoes_json, criado_em)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (cargo_id, usuario, acao, resumo, alteracoes_json, agora))
 
     if atualizar_timestamp:
-        con.execute("UPDATE Cargos SET atualizado_em = datetime('now','localtime') WHERE id = ?", (cargo_id,))
+        con.execute("UPDATE Cargos SET atualizado_em = ? WHERE id = ?", (agora, cargo_id))
 
 from werkzeug.exceptions import HTTPException
 
@@ -834,13 +861,14 @@ def criar_cargo():
     dados = request.get_json()
     con = get_db_connection()
     try:
+        agora = agora_brasilia_str()
         cur = con.execute("""
             INSERT INTO Cargos
               (nome, codigo_fopag, situacao, situacao_delib, tipo_provimento, escolaridade,
                carga_horaria, simbolo_vencimento, total_previstos, total_ocupados, atribuicoes,
                recrutamento, restricao_exigencia, fonte_carga_horaria, fonte_atribuicoes,
-               secretaria)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+               secretaria, criado_em, atualizado_em)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             dados.get("nome"), dados.get("codigo_fopag"), dados.get("situacao", "Em vigor"),
             dados.get("situacao_delib", "não enviado"), dados.get("tipo_provimento", "Efetivo"),
@@ -848,7 +876,7 @@ def criar_cargo():
             dados.get("total_previstos", 0), dados.get("total_ocupados", 0), dados.get("atribuicoes"),
             dados.get("recrutamento"), dados.get("restricao_exigencia"),
             dados.get("fonte_carga_horaria"), dados.get("fonte_atribuicoes"),
-            dados.get("secretaria")
+            dados.get("secretaria"), agora, agora
         ))
         novo_id = cur.lastrowid
         iniciais = []
@@ -1011,7 +1039,7 @@ def mesclar_cargos():
         # 7. Recalcular total_ocupados do destino baseado nos ocupantes reais
         total_ocup_novo = con.execute("SELECT COUNT(*) FROM Ocupantes WHERE cargo_id = ?", (cargo_destino_id,)).fetchone()[0]
         updates["total_ocupados"] = total_ocup_novo
-        updates["atualizado_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        updates["atualizado_em"] = agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
 
         # Aplica updates no cargo destino
         set_clauses = [f"{k} = ?" for k in updates.keys()]
@@ -1364,7 +1392,7 @@ def baixar_relatorio(cargo_id):
 
     import re
     safe_name = re.sub(r'[^\w\s-]', '', dict(cargo)['nome']).strip().replace(' ', '_')
-    filename = f"Relatorio_FOPAG_{safe_name}_{datetime.now().strftime('%Y%m%d')}.pdf"
+    filename = f"Relatorio_FOPAG_{safe_name}_{agora_brasilia().strftime('%Y%m%d')}.pdf"
 
     return send_file(
         io.BytesIO(pdf_bytes),
@@ -1513,7 +1541,7 @@ def relatorios_consolidado():
     except Exception as e:
         abort(500, description=f"Erro ao gerar PDF Consolidado: {e}")
         
-    filename = f"Relatorio_Consolidado_FOPAG_{datetime.now().strftime('%Y%m%d')}.pdf"
+    filename = f"Relatorio_Consolidado_FOPAG_{agora_brasilia().strftime('%Y%m%d')}.pdf"
     
     return send_file(
         io.BytesIO(pdf_bytes),
@@ -1675,7 +1703,7 @@ def relatorios_comissionados_secretaria():
     except Exception as e:
         abort(500, description=f"Erro ao gerar PDF por Secretaria: {e}")
 
-    filename = f"Relatorio_Comissionados_Secretaria_FOPAG_{datetime.now().strftime('%Y%m%d')}.pdf"
+    filename = f"Relatorio_Comissionados_Secretaria_FOPAG_{agora_brasilia().strftime('%Y%m%d')}.pdf"
 
     return send_file(
         io.BytesIO(pdf_bytes),
@@ -1706,9 +1734,8 @@ def leis_historico():
 def fazer_backup():
     """Baixa o banco de dados inteiro como backup."""
     import shutil
-    from datetime import datetime
-    
-    backup_filename = f"Backup_FOPAG_{datetime.now().strftime('%Y%m%d_%H%M')}.db"
+
+    backup_filename = f"Backup_FOPAG_{agora_brasilia().strftime('%Y%m%d_%H%M')}.db"
     
     # É mais seguro copiar o arquivo para um temporário antes de enviar, caso esteja em uso
     import tempfile
@@ -1852,7 +1879,7 @@ def atualizar_ocupante(ocupante_id):
             UPDATE Ocupantes SET
               cargo_id=?, nome=?, matricula=?, tipo_recrutamento=?,
               simbolo_vencimento=?, portaria=?, boletim_oficial=?, data_nomeacao=?,
-              atualizado_em=datetime('now','localtime')
+              atualizado_em=datetime('now','-3 hours')
             WHERE id=?
         """, (
             cargo_id, nome, matricula, dados.get("tipo_recrutamento"),
@@ -2355,7 +2382,7 @@ def atualizar_parcela(parcela_id):
                 natureza_rubrica=?, incorporavel=?, forma_calculo=?,
                 valor_percentual=?, valor_nominal=?, norma_desconhecida=?,
                 data_criacao=?, situacao=?, qualquer_cargo=?, situacao_delib=?,
-                atualizado_em=datetime('now','localtime')
+                atualizado_em=datetime('now','-3 hours')
             WHERE id=?
         """, (
             codigo_fopag,
@@ -2457,7 +2484,7 @@ def transmitir_parcela_tcerj(parcela_id):
 
         con.execute("""
             UPDATE Parcelas
-            SET situacao_delib = 'Enviado', atualizado_em = datetime('now','localtime')
+            SET situacao_delib = 'Enviado', atualizado_em = datetime('now','-3 hours')
             WHERE id = ?
         """, (parcela_id,))
         con.commit()

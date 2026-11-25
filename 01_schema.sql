@@ -64,8 +64,8 @@ CREATE TABLE IF NOT EXISTS Cargos (
     secretaria              TEXT,
 
     -- Auditoria
-    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
-    atualizado_em           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','-3 hours')),
+    atualizado_em           TEXT    NOT NULL DEFAULT (datetime('now','-3 hours'))
 );
 
 -- Índices para as consultas mais frequentes
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS FontesCargaHoraria (
     ano         INTEGER,                -- ex: 2016, 2023
     detalhes    TEXT,                   -- descrição livre / ementa resumida
 
-    criado_em   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    criado_em   TEXT NOT NULL DEFAULT (datetime('now','-3 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_fch_cargo_id ON FontesCargaHoraria (cargo_id);
@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS LeisPertinentes (
     -- Texto original da célula da planilha (preservado para auditoria)
     texto_original  TEXT,
 
-    criado_em       TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    criado_em       TEXT NOT NULL DEFAULT (datetime('now','-3 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_lp_cargo_id ON LeisPertinentes (cargo_id);
@@ -189,7 +189,7 @@ AFTER UPDATE ON Cargos
 FOR EACH ROW
 BEGIN
     UPDATE Cargos
-    SET    atualizado_em = datetime('now','localtime')
+    SET    atualizado_em = datetime('now','-3 hours')
     WHERE  id = OLD.id;
 END;
 
@@ -280,8 +280,8 @@ CREATE TABLE IF NOT EXISTS Ocupantes (
     portaria                TEXT,
     boletim_oficial         TEXT,
     data_nomeacao           TEXT,    -- YYYY-MM-DD
-    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
-    atualizado_em           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','-3 hours')),
+    atualizado_em           TEXT    NOT NULL DEFAULT (datetime('now','-3 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_ocupantes_cargo_id ON Ocupantes (cargo_id);
@@ -329,7 +329,7 @@ CREATE TABLE IF NOT EXISTS HistoricoExoneracoes (
     data_exoneracao         TEXT    NOT NULL,  -- YYYY-MM-DD
     portaria_exoneracao     TEXT    NOT NULL,
     boletim_exoneracao      TEXT    NOT NULL,
-    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+    criado_em               TEXT    NOT NULL DEFAULT (datetime('now','-3 hours'))
 );
 
 -- =============================================================================
@@ -364,8 +364,8 @@ CREATE TABLE IF NOT EXISTS Parcelas (
     situacao            TEXT NOT NULL DEFAULT 'Em vigor' CHECK (situacao IN ('Em vigor', 'Em extinção', 'Extinta', 'Revogada')),
     qualquer_cargo      INTEGER NOT NULL DEFAULT 0,
     situacao_delib      TEXT NOT NULL DEFAULT 'não enviado' CHECK (situacao_delib IN ('Enviado', 'salvo - em revisão', 'não enviado')),
-    criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-    atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    criado_em           TEXT NOT NULL DEFAULT (datetime('now','-3 hours')),
+    atualizado_em       TEXT NOT NULL DEFAULT (datetime('now','-3 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_parcelas_codigo ON Parcelas (codigo_fopag);
@@ -376,7 +376,7 @@ CREATE TABLE IF NOT EXISTS ParcelasBaseCalculo (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
     parcela_base_id     INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
-    criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    criado_em           TEXT NOT NULL DEFAULT (datetime('now','-3 hours')),
     UNIQUE (parcela_id, parcela_base_id)
 );
 
@@ -392,7 +392,7 @@ CREATE TABLE IF NOT EXISTS ParcelasNormas (
     dispositivo         TEXT,
     lei_id              INTEGER REFERENCES LeisPertinentes (id) ON DELETE SET NULL,
     detalhes            TEXT,
-    criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    criado_em           TEXT NOT NULL DEFAULT (datetime('now','-3 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_pn_parcela ON ParcelasNormas (parcela_id);
@@ -401,7 +401,7 @@ CREATE TABLE IF NOT EXISTS ParcelasCargos (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     parcela_id          INTEGER NOT NULL REFERENCES Parcelas (id) ON DELETE CASCADE,
     cargo_id            INTEGER NOT NULL REFERENCES Cargos (id) ON DELETE CASCADE,
-    criado_em           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    criado_em           TEXT NOT NULL DEFAULT (datetime('now','-3 hours')),
     UNIQUE (parcela_id, cargo_id)
 );
 
@@ -411,7 +411,7 @@ CREATE INDEX IF NOT EXISTS idx_pc_cargo   ON ParcelasCargos (cargo_id);
 CREATE TRIGGER IF NOT EXISTS trg_parcelas_atualizado_em
 AFTER UPDATE ON Parcelas FOR EACH ROW
 BEGIN
-    UPDATE Parcelas SET atualizado_em = datetime('now','localtime') WHERE id = OLD.id;
+    UPDATE Parcelas SET atualizado_em = datetime('now','-3 hours') WHERE id = OLD.id;
 END;
 
 
@@ -428,7 +428,7 @@ CREATE TABLE IF NOT EXISTS HistoricoAlteracoesCargos (
     acao                TEXT    NOT NULL,
     resumo              TEXT,
     alteracoes_json     TEXT,
-    criado_em           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+    criado_em           TEXT    NOT NULL DEFAULT (datetime('now','-3 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_hac_cargo_id  ON HistoricoAlteracoesCargos (cargo_id);

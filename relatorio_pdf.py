@@ -8,7 +8,12 @@ from fpdf import FPDF
 from fpdf.fonts import FontFace
 from fpdf.enums import TableBordersLayout
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+FUSO_BRASILIA = timezone(timedelta(hours=-3))
+
+def agora_brasilia() -> datetime:
+    return datetime.now(FUSO_BRASILIA)
 from typing import List, Dict, Any
 
 BASE_DIR = Path(__file__).parent
@@ -100,7 +105,7 @@ class RelatorioCargoPDF(FPDF):
         # Direita: data
         self._set_font("I", 7.5)
         self.set_text_color(*CINZA_400)
-        agora = datetime.now().strftime("%d/%m/%Y")
+        agora = agora_brasilia().strftime("%d/%m/%Y")
         self.cell(w=0, h=5, txt=agora, ln=1, align="R")
 
         self.set_x(self.MARGIN_X)
@@ -127,7 +132,7 @@ class RelatorioCargoPDF(FPDF):
 
         self._set_font("", 7)
         self.set_text_color(*CINZA_400)
-        agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+        agora = agora_brasilia().strftime("%d/%m/%Y %H:%M")
         self.cell(w=0, h=5, txt=f"FOPAG — Prefeitura Municipal de Miracema · Gerado em {agora}",
                   ln=0, align="L")
         self.cell(w=0, h=5, txt=f"Página {self.page_no()} de {{nb}}", ln=0, align="R")
@@ -373,7 +378,7 @@ class RelatorioCargoPDF(FPDF):
         self.set_xy(self.MARGIN_X, PAGE_H - 13)
         self._set_font("", 7.5)
         self.set_text_color(180, 210, 255)
-        agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+        agora = agora_brasilia().strftime("%d/%m/%Y %H:%M")
         self.cell(w=0, h=5, txt=f"Documento gerado em {agora} · Confidencial · Uso interno",
                   align="C", ln=0)
 
@@ -902,7 +907,7 @@ class RelatorioConsolidadoPDF(FPDF):
         # Direita: data
         self._set_font("I", 7.5)
         self.set_text_color(*CINZA_400)
-        agora = datetime.now().strftime("%d/%m/%Y")
+        agora = agora_brasilia().strftime("%d/%m/%Y")
         self.cell(w=0, h=5, txt=agora, ln=1, align="R")
 
         self.set_x(self.MARGIN_X)
@@ -929,7 +934,7 @@ class RelatorioConsolidadoPDF(FPDF):
 
         self._set_font("", 7)
         self.set_text_color(*CINZA_400)
-        agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+        agora = agora_brasilia().strftime("%d/%m/%Y %H:%M")
         self.cell(w=0, h=5, txt=f"FOPAG — Relatório Gerencial · Gerado em {agora}",
                   ln=0, align="L")
         self.cell(w=0, h=5, txt=f"Página {self.page_no()} de {{nb}}", ln=0, align="R")
@@ -1101,7 +1106,7 @@ class RelatorioConsolidadoPDF(FPDF):
         self.set_xy(self.MARGIN_X, PAGE_H - 13)
         self._set_font("", 7.5)
         self.set_text_color(180, 210, 255)
-        agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+        agora = agora_brasilia().strftime("%d/%m/%Y %H:%M")
         self.cell(w=0, h=5, txt=f"Relatório consolidado gerado em {agora} · Prefeitura de Miracema",
                   align="C", ln=0)
 
@@ -1324,7 +1329,7 @@ class RelatorioComissionadosSecretariaPDF(FPDF):
         # Direita: data
         self._set_font("I", 7.5)
         self.set_text_color(*CINZA_400)
-        agora = datetime.now().strftime("%d/%m/%Y")
+        agora = agora_brasilia().strftime("%d/%m/%Y")
         self.cell(w=0, h=5, txt=agora, ln=1, align="R")
 
         self.set_x(self.MARGIN_X)
@@ -1351,7 +1356,7 @@ class RelatorioComissionadosSecretariaPDF(FPDF):
 
         self._set_font("", 7)
         self.set_text_color(*CINZA_400)
-        agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+        agora = agora_brasilia().strftime("%d/%m/%Y %H:%M")
         self.cell(w=0, h=5, txt=f"FOPAG — Relatório por Secretaria · Gerado em {agora}",
                   ln=0, align="L")
         self.cell(w=0, h=5, txt=f"Página {self.page_no()} de {{nb}}", ln=0, align="R")
@@ -1651,7 +1656,7 @@ class RelatorioComissionadosSecretariaPDF(FPDF):
         self.set_xy(self.MARGIN_X, PAGE_H - 13)
         self._set_font("", 7.5)
         self.set_text_color(180, 210, 255)
-        agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+        agora = agora_brasilia().strftime("%d/%m/%Y %H:%M")
         self.cell(w=0, h=5, txt=f"Documento gerado em {agora} · Confidencial · Uso interno",
                   align="C", ln=0)
 
@@ -1870,7 +1875,7 @@ def gerar_relatorio_cargos_selecionados(cargos_detalhados: list) -> bytes:
     pdf.set_xy(pdf.MARGIN_X, PAGE_H - 13)
     pdf._set_font("", 7.5)
     pdf.set_text_color(180, 210, 255)
-    agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+    agora = agora_brasilia().strftime("%d/%m/%Y %H:%M")
     pdf.cell(w=0, h=5, txt=f"Documento gerado em {agora} · Relatório Customizado · PMM", align="C", ln=0)
     
     # Renderiza cada cargo iniciando estritamente em uma nova página (quebra por cargo)
